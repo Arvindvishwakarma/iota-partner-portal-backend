@@ -1,0 +1,168 @@
+import { Response, NextFunction } from 'express';
+import { adminService } from '../services/admin.service';
+import { AuthenticatedRequest } from '../middlewares/auth.middleware';
+import { PartnerCategory, PartnerStatus, PremisesStatus, Role, VisitStatus } from '../shared';
+
+export class AdminController {
+  async getDashboard(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const data = await adminService.getDashboardMetrics();
+      res.status(200).json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // Staff Handlers
+  async listStaff(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const role = req.query.role as Role | undefined;
+      const search = req.query.search as string | undefined;
+      const isActive = req.query.isActive !== undefined ? req.query.isActive === 'true' : undefined;
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+
+      const result = await adminService.listStaff(role, search, isActive, page, limit);
+      res.status(200).json({ success: true, data: result.staff, meta: result.meta });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async createStaff(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const user = await adminService.createStaff(req.body);
+      res.status(201).json({ success: true, data: user, message: 'Staff user created successfully' });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateStaffStatus(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const { isActive } = req.body;
+      const user = await adminService.updateStaffStatus(id, isActive);
+      res.status(200).json({ success: true, data: user, message: 'Staff status updated successfully' });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // Partner Handlers
+  async listPartners(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const status = req.query.status as PartnerStatus | undefined;
+      const category = req.query.category as PartnerCategory | undefined;
+      const search = req.query.search as string | undefined;
+      const city = req.query.city as string | undefined;
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+
+      const result = await adminService.listPartners(status, category, search, city, page, limit);
+      res.status(200).json({ success: true, data: result.partners, meta: result.meta });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getPartner(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const partner = await adminService.getPartnerDetails(id);
+      res.status(200).json({ success: true, data: partner });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async reviewPartner(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const { status, rejectionReason } = req.body;
+      const updated = await adminService.reviewPartner(id, status, rejectionReason);
+      res.status(200).json({
+        success: true,
+        data: updated,
+        message: status === PartnerStatus.ACTIVE ? 'Partner approved and unique ID generated' : 'Partner registration rejected'
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // Premises Handlers
+  async listPremises(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const status = req.query.status as PremisesStatus | undefined;
+      const category = req.query.category as PartnerCategory | undefined;
+      const search = req.query.search as string | undefined;
+      const city = req.query.city as string | undefined;
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+
+      const result = await adminService.listPremises(status, category, search, city, page, limit);
+      res.status(200).json({ success: true, data: result.premises, meta: result.meta });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async createPremises(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const premises = await adminService.createPremises(req.body);
+      res.status(201).json({ success: true, data: premises, message: 'Premises created successfully' });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async assignVisit(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { premisesId, salespersonId, scheduledDate } = req.body;
+      const visit = await adminService.assignPremisesVisit(premisesId, salespersonId, scheduledDate);
+      res.status(200).json({ success: true, data: visit, message: 'Premises visit assigned successfully' });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async bulkAssignVisits(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { premisesIds, salespersonId, scheduledDate } = req.body;
+      const result = await adminService.bulkAssignVisits(premisesIds, salespersonId, scheduledDate);
+      res.status(200).json({ success: true, data: result, message: `${result.assignedCount} visits assigned successfully` });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // Lead Handlers
+  async listLeads(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+
+      const result = await adminService.listAllLeads(req.query, page, limit);
+      res.status(200).json({ success: true, data: result.leads, meta: result.meta });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async reassignLead(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const { counsellorId, remarks } = req.body;
+      const adminUserId = req.user!.userId;
+
+      const updated = await adminService.reassignLead(id, counsellorId, adminUserId, remarks);
+      res.status(200).json({ success: true, data: updated, message: 'Lead reassigned successfully' });
+    } catch (err) {
+      next(err);
+    }
+  }
+}
+
+export const adminController = new AdminController();
+
