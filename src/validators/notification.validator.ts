@@ -55,3 +55,4 @@ export const queryNotificationsSchema = z.object({
 
 export type SendNotificationInput = z.infer<typeof sendNotificationSchema>;
 export type QueryNotificationsInput = z.infer<typeof queryNotificationsSchema>;
+

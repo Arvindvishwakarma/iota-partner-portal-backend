@@ -32,3 +32,4 @@ router.post('/admin/retry/:id', requireRole([Role.ADMIN]), (req, res, next) =>
 );
 
 export default router;
+

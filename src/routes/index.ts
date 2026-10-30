@@ -8,6 +8,7 @@ import counsellorRoutes from './counsellor.routes';
 import salesRoutes from './sales.routes';
 import settlementRoutes from './settlement.routes';
 import notificationRoutes from './notification.routes';
+import reportRoutes from './report.routes';
 
 const apiRouter = Router();
 
@@ -37,6 +38,9 @@ apiRouter.use('/settlements', settlementRoutes);
 
 // Mount Central Notification Hub under /api/v1/notifications
 apiRouter.use('/notifications', notificationRoutes);
+
+// Mount Reports & Analytics under /api/v1/reports
+apiRouter.use('/reports', reportRoutes);
 
 export default apiRouter;
 
