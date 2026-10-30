@@ -7,6 +7,7 @@ import partnerRoutes from './partner.routes';
 import counsellorRoutes from './counsellor.routes';
 import salesRoutes from './sales.routes';
 import settlementRoutes from './settlement.routes';
+import notificationRoutes from './notification.routes';
 
 const apiRouter = Router();
 
@@ -33,6 +34,9 @@ apiRouter.use('/sales', salesRoutes);
 
 // Mount Settlement & Admissions Engine under /api/v1/settlements
 apiRouter.use('/settlements', settlementRoutes);
+
+// Mount Central Notification Hub under /api/v1/notifications
+apiRouter.use('/notifications', notificationRoutes);
 
 export default apiRouter;
 
