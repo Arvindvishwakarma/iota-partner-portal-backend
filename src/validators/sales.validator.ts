@@ -49,3 +49,4 @@ export const onboardPartnerSchema = z.object({
 export type CheckInInput = z.infer<typeof checkInSchema>;
 export type CheckOutInput = z.infer<typeof checkOutSchema>;
 export type OnboardPartnerInput = z.infer<typeof onboardPartnerSchema>;
+

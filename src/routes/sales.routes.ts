@@ -39,3 +39,4 @@ router.post('/partners/onboard', validateBody(onboardPartnerSchema), (req, res, 
 router.get('/leads', (req, res, next) => salesController.getLeads(req, res, next));
 
 export default router;
+

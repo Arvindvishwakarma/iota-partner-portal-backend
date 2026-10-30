@@ -6,6 +6,7 @@ import publicRoutes from './public.routes';
 import partnerRoutes from './partner.routes';
 import counsellorRoutes from './counsellor.routes';
 import salesRoutes from './sales.routes';
+import settlementRoutes from './settlement.routes';
 
 const apiRouter = Router();
 
@@ -29,6 +30,9 @@ apiRouter.use('/counsellor', counsellorRoutes);
 
 // Mount Field Sales Module endpoints under /api/v1/sales
 apiRouter.use('/sales', salesRoutes);
+
+// Mount Settlement & Admissions Engine under /api/v1/settlements
+apiRouter.use('/settlements', settlementRoutes);
 
 export default apiRouter;
 
