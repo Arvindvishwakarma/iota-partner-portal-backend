@@ -56,13 +56,19 @@ export const bulkImportPremisesSchema = z.object({
 export const assignVisitSchema = z.object({
   premisesId: z.string().uuid('Valid premises ID required'),
   salespersonId: z.string().uuid('Valid salesperson ID required'),
-  scheduledDate: z.string().datetime().optional()
+  scheduledDate: z
+    .string()
+    .refine((val) => !val || !isNaN(Date.parse(val)), { message: 'Invalid date format' })
+    .optional()
 });
 
 export const bulkAssignVisitsSchema = z.object({
   premisesIds: z.array(z.string().uuid()).min(1, 'At least one premises ID is required'),
   salespersonId: z.string().uuid('Valid salesperson ID required'),
-  scheduledDate: z.string().datetime().optional()
+  scheduledDate: z
+    .string()
+    .refine((val) => !val || !isNaN(Date.parse(val)), { message: 'Invalid date format' })
+    .optional()
 });
 
 // Lead Reassignment Schema
