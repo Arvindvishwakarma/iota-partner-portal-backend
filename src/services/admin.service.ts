@@ -223,6 +223,73 @@ export class AdminService {
   // ============================================================================
 
   async listPartners(status?: PartnerStatus, category?: PartnerCategory, search?: string, city?: string, page = 1, limit = 20) {
+    // 0. Auto-sync any onboarded premises that do not have a partner record yet
+    try {
+      const unlinkedOnboardedPremises = await prisma.premises.findMany({
+        where: {
+          currentStatus: PremisesStatus.PARTNER_ONBOARDED,
+          partner: null
+        },
+        include: { visits: { orderBy: { createdAt: 'desc' }, take: 1 } }
+      });
+
+      for (const p of unlinkedOnboardedPremises) {
+        const rawPhone = p.mobile.replace(/\D/g, '');
+        const normalizedMobile = p.mobile.startsWith('+91')
+          ? p.mobile
+          : `+91${rawPhone}`;
+        const email = `${rawPhone || p.id.slice(0, 8)}@partner.iotaacademy.in`;
+
+        let user = await prisma.user.findFirst({
+          where: { OR: [{ email }, { phone: normalizedMobile }] }
+        });
+
+        if (!user) {
+          const defaultPasswordHash = await hashPassword('Partner@123456');
+          user = await prisma.user.create({
+            data: {
+              email,
+              phone: normalizedMobile,
+              fullName: p.ownerName,
+              passwordHash: defaultPasswordHash,
+              role: Role.PARTNER,
+              isActive: false
+            }
+          });
+        }
+
+        const partnerCode = `PTR-PENDING-${p.id.substring(0, 6).toUpperCase()}`;
+        const registrationUrl = `${env.FRONTEND_URL}/register/${partnerCode}`;
+        const salespersonId = p.visits?.[0]?.salespersonId || p.assignedSalesId || null;
+
+        await prisma.partner.create({
+          data: {
+            userId: user.id,
+            premisesId: p.id,
+            partnerCode,
+            businessName: p.premisesName,
+            category: p.category,
+            ownerName: p.ownerName,
+            contactPerson: p.contactPerson || p.ownerName,
+            mobile: normalizedMobile,
+            email,
+            addressLine1: p.addressLine1,
+            addressLine2: p.addressLine2,
+            city: p.city,
+            area: p.area,
+            pincode: p.pincode,
+            latitude: p.latitude,
+            longitude: p.longitude,
+            registrationUrl,
+            status: PartnerStatus.PENDING_APPROVAL,
+            onboardedByUserId: salespersonId
+          }
+        });
+      }
+    } catch (syncErr) {
+      console.warn('Failed to auto-sync unlinked onboarded premises to partners:', syncErr);
+    }
+
     const where: any = { deletedAt: null };
 
     if (status) where.status = status;
@@ -292,7 +359,7 @@ export class AdminService {
     if (status === PartnerStatus.ACTIVE) {
       // Deterministic unique partner code if not yet assigned
       let partnerCode = partner.partnerCode;
-      if (!partnerCode || partnerCode.startsWith('TEMP')) {
+      if (!partnerCode || partnerCode.startsWith('TEMP') || partnerCode.startsWith('PTR-PENDING')) {
         const cityPrefix = (partner.city || 'BLR').substring(0, 3).toUpperCase();
         const count = await prisma.partner.count({ where: { status: PartnerStatus.ACTIVE } });
         const seq = String(count + 1).padStart(4, '0');
@@ -302,6 +369,14 @@ export class AdminService {
       const registrationUrl = `${env.FRONTEND_URL}/register/${partnerCode}`;
 
       const updated = await prisma.$transaction(async (tx) => {
+        // Activate user login account
+        if (partner.userId) {
+          await tx.user.update({
+            where: { id: partner.userId },
+            data: { isActive: true }
+          });
+        }
+
         const p = await tx.partner.update({
           where: { id: partnerId },
           data: {

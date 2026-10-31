@@ -377,6 +377,72 @@ export class SalesService {
         data: { currentStatus: nextPremisesStatus }
       });
 
+      // If status is PARTNER_ONBOARDED, ensure Partner record exists in PENDING_APPROVAL status for Super Admin review
+      if (data.status === VisitStatus.PARTNER_ONBOARDED) {
+        const existingPartner = await tx.partner.findUnique({
+          where: { premisesId: visit!.premisesId }
+        });
+
+        if (!existingPartner) {
+          const prem = await tx.premises.findUnique({
+            where: { id: visit!.premisesId }
+          });
+
+          if (prem) {
+            const rawPhone = prem.mobile.replace(/\D/g, '');
+            const normalizedMobile = prem.mobile.startsWith('+91')
+              ? prem.mobile
+              : `+91${rawPhone}`;
+            const email = `${rawPhone || prem.id.slice(0, 8)}@partner.iotaacademy.in`;
+
+            let user = await tx.user.findFirst({
+              where: { OR: [{ email }, { phone: normalizedMobile }] }
+            });
+
+            if (!user) {
+              const defaultPasswordHash = await hashPassword('Partner@123456');
+              user = await tx.user.create({
+                data: {
+                  email,
+                  phone: normalizedMobile,
+                  fullName: prem.ownerName,
+                  passwordHash: defaultPasswordHash,
+                  role: Role.PARTNER,
+                  isActive: false // Inactive until Super Admin accepts approval
+                }
+              });
+            }
+
+            const partnerCode = `PTR-PENDING-${prem.id.substring(0, 6).toUpperCase()}`;
+            const registrationUrl = `${env.FRONTEND_URL}/register/${partnerCode}`;
+
+            await tx.partner.create({
+              data: {
+                userId: user.id,
+                premisesId: prem.id,
+                partnerCode,
+                businessName: prem.premisesName,
+                category: prem.category,
+                ownerName: prem.ownerName,
+                contactPerson: prem.contactPerson || prem.ownerName,
+                mobile: normalizedMobile,
+                email,
+                addressLine1: prem.addressLine1,
+                addressLine2: prem.addressLine2,
+                city: prem.city,
+                area: prem.area,
+                pincode: prem.pincode,
+                latitude: prem.latitude,
+                longitude: prem.longitude,
+                registrationUrl,
+                status: PartnerStatus.PENDING_APPROVAL,
+                onboardedByUserId: salespersonId
+              }
+            });
+          }
+        }
+      }
+
       return v;
     });
 
