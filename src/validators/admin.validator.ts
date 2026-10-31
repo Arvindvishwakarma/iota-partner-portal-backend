@@ -4,16 +4,32 @@ import { PartnerCategory, PartnerStatus, PremisesStatus, Role } from '../shared'
 // Create Counselor or Sales User
 export const createStaffSchema = z.object({
   fullName: z.string().min(2, 'Full name must be at least 2 characters').trim(),
-  email: z.string().email('Valid email is required').toLowerCase().trim(),
-  phone: z.string().min(10, 'Valid 10-digit phone number is required').trim(),
-  password: z.string().min(8, 'Password must be at least 8 characters').optional(),
-  role: z.enum([Role.COUNSELLOR, Role.SALES], {
-    errorMap: () => ({ message: "Role must be 'COUNSELLOR' or 'SALES'" })
-  })
+  email: z.string().email('Valid email address is required').toLowerCase().trim(),
+  phone: z.string().min(7, 'Valid phone number is required (at least 7 digits)').trim(),
+  password: z.string().min(6, 'Password must be at least 6 characters').optional().or(z.literal('')),
+  role: z.preprocess(
+    (val) => (typeof val === 'string' ? val.toUpperCase() : val),
+    z.enum([Role.COUNSELLOR, Role.SALES], {
+      errorMap: () => ({ message: "Role must be 'COUNSELLOR' or 'SALES'" })
+    })
+  ),
+  territory: z.string().optional(),
+  assignedTerritory: z.string().optional()
 });
 
 export const updateStaffStatusSchema = z.object({
   isActive: z.boolean({ required_error: 'isActive boolean flag is required' })
+});
+
+export const updateStaffSchema = z.object({
+  fullName: z.string().min(2, 'Full name must be at least 2 characters').trim().optional(),
+  email: z.string().email('Valid email is required').toLowerCase().trim().optional(),
+  phone: z.string().min(10, 'Valid 10-digit phone number is required').trim().optional(),
+  isActive: z.boolean().optional()
+});
+
+export const resetStaffPasswordSchema = z.object({
+  password: z.string().min(6, 'Password must be at least 6 characters').trim()
 });
 
 // Partner Approval / Rejection

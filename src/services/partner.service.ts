@@ -79,8 +79,14 @@ export class PartnerService {
       .filter((i) => i.status === CommissionStatus.PAID)
       .reduce((acc, item) => acc + (Number(item._sum.commissionAmount) || 0), 0);
 
+    const baseUrl = (env.FRONTEND_URL || 'https://iota-partner-portal-frontend.vercel.app').replace(/\/+$/, '');
+    const liveRegistrationUrl = `${baseUrl}/register/${partner.partnerCode}`;
+
     return {
-      partner,
+      partner: {
+        ...partner,
+        registrationUrl: liveRegistrationUrl
+      },
       metrics: {
         totalLeads,
         todayLeads,
@@ -110,7 +116,8 @@ export class PartnerService {
 
     if (!partner) throw new AppError('Partner not found', 404, 'NOT_FOUND');
 
-    const registrationUrl = partner.registrationUrl || `${env.FRONTEND_URL}/register/${partner.partnerCode}`;
+    const baseUrl = (env.FRONTEND_URL || 'https://iota-partner-portal-frontend.vercel.app').replace(/\/+$/, '');
+    const registrationUrl = `${baseUrl}/register/${partner.partnerCode}`;
 
     // Generate live PNG data URL & SVG string
     const [pngDataUrl, svgString] = await Promise.all([

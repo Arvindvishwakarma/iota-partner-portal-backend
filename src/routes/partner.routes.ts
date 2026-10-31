@@ -12,6 +12,7 @@ router.use(authenticateJwt, requireRole([Role.PARTNER]));
 
 router.get('/dashboard', partnerController.getDashboard.bind(partnerController));
 router.get('/assets/qr', partnerController.getQrAssets.bind(partnerController));
+router.get('/qr', partnerController.getQrAssets.bind(partnerController));
 router.get('/leads', partnerController.getLeads.bind(partnerController));
 router.get('/commissions', partnerController.getCommissions.bind(partnerController));
 router.get('/settlements', partnerController.getSettlements.bind(partnerController));

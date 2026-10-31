@@ -6,6 +6,8 @@ import { Role } from '../shared';
 import {
   createStaffSchema,
   updateStaffStatusSchema,
+  updateStaffSchema,
+  resetStaffPasswordSchema,
   partnerApprovalSchema,
   createPremisesSchema,
   assignVisitSchema,
@@ -25,6 +27,10 @@ router.get('/dashboard', adminController.getDashboard);
 router.get('/staff', adminController.listStaff);
 router.post('/staff', validateBody(createStaffSchema), adminController.createStaff);
 router.patch('/staff/:id/status', validateBody(updateStaffStatusSchema), adminController.updateStaffStatus);
+router.patch('/staff/:id/password', validateBody(resetStaffPasswordSchema), adminController.resetStaffPassword);
+router.post('/staff/:id/password', validateBody(resetStaffPasswordSchema), adminController.resetStaffPassword);
+router.patch('/staff/:id', validateBody(updateStaffSchema), adminController.updateStaff);
+router.put('/staff/:id', validateBody(updateStaffSchema), adminController.updateStaff);
 
 // Partner Management & KYC Review
 router.get('/partners', adminController.listPartners);

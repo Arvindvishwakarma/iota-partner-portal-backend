@@ -35,11 +35,15 @@ export const errorHandler = (
 
     logger.warn(`Validation Error [${correlationId}]:`, { errors: fieldErrors });
 
+    const readableMessage = fieldErrors.length > 0
+      ? fieldErrors.map((f) => f.issue).join(', ')
+      : 'Request payload validation failed';
+
     return res.status(400).json({
       success: false,
       error: {
         code: 'VALIDATION_FAILED',
-        message: 'Request payload validation failed',
+        message: readableMessage,
         details: fieldErrors
       }
     });

@@ -218,6 +218,73 @@ export class AdminService {
     });
   }
 
+  async updateStaff(userId: string, data: { fullName?: string; email?: string; phone?: string; isActive?: boolean }) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
+
+    if (data.email && data.email.toLowerCase() !== user.email.toLowerCase()) {
+      const existingEmail = await prisma.user.findFirst({
+        where: {
+          email: data.email.toLowerCase().trim(),
+          id: { not: userId }
+        }
+      });
+      if (existingEmail) {
+        throw new AppError('A user with this email already exists', 400, 'EMAIL_EXISTS');
+      }
+    }
+
+    if (data.phone && data.phone.trim() !== user.phone) {
+      const existingPhone = await prisma.user.findFirst({
+        where: {
+          phone: data.phone.trim(),
+          id: { not: userId }
+        }
+      });
+      if (existingPhone) {
+        throw new AppError('A user with this phone number already exists', 400, 'PHONE_EXISTS');
+      }
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.fullName ? { fullName: data.fullName.trim() } : {}),
+        ...(data.email ? { email: data.email.toLowerCase().trim() } : {}),
+        ...(data.phone ? { phone: data.phone.trim() } : {}),
+        ...(typeof data.isActive === 'boolean' ? { isActive: data.isActive } : {})
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        createdAt: true
+      }
+    });
+
+    return updated;
+  }
+
+  async resetStaffPassword(userId: string, newPassword: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
+
+    if (!newPassword || newPassword.length < 6) {
+      throw new AppError('Password must be at least 6 characters', 400, 'INVALID_PASSWORD');
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash }
+    });
+
+    return { id: user.id, email: user.email, fullName: user.fullName, updated: true };
+  }
+
   // ============================================================================
   // PARTNER MANAGEMENT
   // ============================================================================
