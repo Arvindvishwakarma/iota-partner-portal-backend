@@ -30,12 +30,22 @@ export class ReportService {
       recentLeads
     ] = await Promise.all([
       prisma.lead.count({ where: whereLead }),
-      prisma.lead.count({ where: { ...whereLead, status: LeadStatus.ADMITTED } }),
+      prisma.lead.count({ where: { ...whereLead, status: LeadStatus.ADMISSION_CONFIRMED } }),
       prisma.lead.count({ where: { ...whereLead, status: LeadStatus.LOST } }),
       prisma.lead.count({
         where: {
           ...whereLead,
-          status: { in: [LeadStatus.NEW, LeadStatus.CONTACTED, LeadStatus.INTERESTED, LeadStatus.VISITED] }
+          status: {
+            in: [
+              LeadStatus.NEW,
+              LeadStatus.CONTACTED,
+              LeadStatus.CONNECTED,
+              LeadStatus.INTERESTED,
+              LeadStatus.OFFICE_VISIT_SCHEDULED,
+              LeadStatus.OFFICE_VISIT_COMPLETED,
+              LeadStatus.DEMO_ATTENDED
+            ]
+          }
         }
       }),
       prisma.partner.count(),
@@ -72,7 +82,7 @@ export class ReportService {
       const entry = dayMap.get(key);
       if (entry) {
         entry.leads += 1;
-        if (lead.status === LeadStatus.ADMITTED) {
+        if (lead.status === LeadStatus.ADMISSION_CONFIRMED) {
           entry.admissions += 1;
         }
       }
@@ -167,25 +177,34 @@ export class ReportService {
         phone: true,
         _count: {
           select: {
-            assignedLeads: true,
+            leadAssignments: true,
             leadActivities: true
           }
         },
-        assignedLeads: {
+        leadAssignments: {
           select: {
-            status: true,
-            createdAt: true,
-            updatedAt: true
+            isCurrent: true,
+            lead: {
+              select: {
+                status: true,
+                createdAt: true,
+                updatedAt: true
+              }
+            }
           }
         }
       }
     });
 
     return counsellors.map((c) => {
-      const assigned = c._count.assignedLeads;
-      const converted = c.assignedLeads.filter((l) => l.status === LeadStatus.ADMITTED).length;
-      const lost = c.assignedLeads.filter((l) => l.status === LeadStatus.LOST).length;
-      const inProgress = assigned - converted - lost;
+      const assigned = c._count.leadAssignments;
+      const converted = c.leadAssignments.filter(
+        (la) => la.isCurrent && la.lead.status === LeadStatus.ADMISSION_CONFIRMED
+      ).length;
+      const lost = c.leadAssignments.filter(
+        (la) => la.isCurrent && la.lead.status === LeadStatus.LOST
+      ).length;
+      const inProgress = Math.max(0, assigned - converted - lost);
       const activities = c._count.leadActivities;
       const conversionRate = assigned > 0 ? ((converted / assigned) * 100).toFixed(1) : '0.0';
 
@@ -217,23 +236,22 @@ export class ReportService {
         phone: true,
         _count: {
           select: {
-            premisesVisits: true
+            assignedVisits: true
           }
         },
-        premisesVisits: {
+        assignedVisits: {
           select: {
-            distanceMeters: true,
-            checkInTime: true,
-            checkOutTime: true
+            distanceFromTarget: true,
+            visitedAt: true
           }
         }
       }
     });
 
     return salesTeam.map((s) => {
-      const totalVisits = s._count.premisesVisits;
-      const validGeoVisits = s.premisesVisits.filter(
-        (v) => v.distanceMeters !== null && v.distanceMeters <= 500
+      const totalVisits = s._count.assignedVisits;
+      const validGeoVisits = s.assignedVisits.filter(
+        (v) => v.distanceFromTarget !== null && v.distanceFromTarget <= 500
       ).length;
       const geofenceCompliance =
         totalVisits > 0 ? Math.round((validGeoVisits / totalVisits) * 100) : 100;

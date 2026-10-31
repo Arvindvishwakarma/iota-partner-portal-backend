@@ -22,7 +22,20 @@ export const createApp = (): Express => {
   // CORS Configuration
   app.use(
     cors({
-      origin: [env.FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:3000'],
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, or server-to-server)
+        if (!origin) return callback(null, true);
+
+        const allowed = [env.FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:3000'];
+        if (
+          allowed.includes(origin) ||
+          origin.endsWith('.vercel.app') ||
+          (env.FRONTEND_URL && origin.startsWith(env.FRONTEND_URL))
+        ) {
+          return callback(null, true);
+        }
+        return callback(null, true);
+      },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Correlation-Id', 'Idempotency-Key']

@@ -30,7 +30,9 @@ export class AdminService {
       totalVisits,
       totalCounselors,
       totalSalespersons,
-      commissionsAgg
+      commissionsAgg,
+      recentPendingPartners,
+      recentLeads
     ] = await Promise.all([
       prisma.lead.count(),
       prisma.lead.count({
@@ -40,9 +42,9 @@ export class AdminService {
           }
         }
       }),
-      prisma.partner.count(),
-      prisma.partner.count({ where: { status: PartnerStatus.ACTIVE } }),
-      prisma.partner.count({ where: { status: PartnerStatus.PENDING_APPROVAL } }),
+      prisma.partner.count({ where: { deletedAt: null } }),
+      prisma.partner.count({ where: { status: PartnerStatus.ACTIVE, deletedAt: null } }),
+      prisma.partner.count({ where: { status: PartnerStatus.PENDING_APPROVAL, deletedAt: null } }),
       prisma.admission.count(),
       prisma.admission.count({ where: { status: AdmissionStatus.VERIFIED } }),
       prisma.premisesVisit.count(),
@@ -51,6 +53,35 @@ export class AdminService {
       prisma.partnerCommission.groupBy({
         by: ['status'],
         _sum: { commissionAmount: true }
+      }),
+      prisma.partner.findMany({
+        where: { status: PartnerStatus.PENDING_APPROVAL, deletedAt: null },
+        select: {
+          id: true,
+          partnerCode: true,
+          businessName: true,
+          ownerName: true,
+          category: true,
+          city: true,
+          area: true,
+          mobile: true,
+          createdAt: true
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 5
+      }),
+      prisma.lead.findMany({
+        select: {
+          id: true,
+          leadCode: true,
+          studentName: true,
+          city: true,
+          status: true,
+          createdAt: true,
+          partner: { select: { businessName: true, partnerCode: true } }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 5
       })
     ]);
 
@@ -78,7 +109,9 @@ export class AdminService {
         totalCommission: totalCommissionEarned,
         pendingCommission: pendingCommissionAmount,
         paidCommission: paidCommissionAmount
-      }
+      },
+      recentPendingPartners,
+      recentLeads
     };
   }
 
@@ -442,6 +475,100 @@ export class AdminService {
     return { assignedCount: results.length, visits: results };
   }
 
+  async listAllVisits(filters: any = {}, page = 1, limit = 25) {
+    const where: any = {};
+
+    if (filters.status && filters.status !== 'ALL') {
+      where.status = filters.status;
+    }
+    if (filters.salespersonId && filters.salespersonId !== 'ALL') {
+      where.salespersonId = filters.salespersonId;
+    }
+    if (filters.premisesId) {
+      where.premisesId = filters.premisesId;
+    }
+
+    if (filters.search) {
+      const s = filters.search;
+      where.OR = [
+        { premises: { premisesName: { contains: s, mode: 'insensitive' } } },
+        { premises: { area: { contains: s, mode: 'insensitive' } } },
+        { premises: { city: { contains: s, mode: 'insensitive' } } },
+        { salesperson: { fullName: { contains: s, mode: 'insensitive' } } }
+      ];
+    }
+
+    const [total, visits, statsAgg] = await Promise.all([
+      prisma.premisesVisit.count({ where }),
+      prisma.premisesVisit.findMany({
+        where,
+        include: {
+          premises: {
+            select: {
+              id: true,
+              premisesName: true,
+              category: true,
+              ownerName: true,
+              mobile: true,
+              addressLine1: true,
+              city: true,
+              area: true,
+              latitude: true,
+              longitude: true
+            }
+          },
+          salesperson: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              phone: true
+            }
+          }
+        },
+        orderBy: { assignedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit
+      }),
+      Promise.all([
+        prisma.premisesVisit.count(),
+        prisma.premisesVisit.count({ where: { status: VisitStatus.ASSIGNED } }),
+        prisma.premisesVisit.count({ where: { status: VisitStatus.IN_PROGRESS } }),
+        prisma.premisesVisit.count({
+          where: {
+            status: {
+              in: [
+                VisitStatus.COMPLETED,
+                VisitStatus.INTERESTED,
+                VisitStatus.NOT_INTERESTED,
+                VisitStatus.PARTNER_ONBOARDED
+              ]
+            }
+          }
+        }),
+        prisma.premisesVisit.count({
+          where: {
+            distanceFromTarget: { lte: 500 }
+          }
+        })
+      ])
+    ]);
+
+    const [totalAll, assignedCount, inProgressCount, completedCount, geofenceCompliantCount] = statsAgg;
+
+    return {
+      visits,
+      stats: {
+        total: totalAll,
+        assigned: assignedCount,
+        inProgress: inProgressCount,
+        completed: completedCount,
+        geofenceCompliant: geofenceCompliantCount
+      },
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) }
+    };
+  }
+
   // ============================================================================
   // GLOBAL LEAD MONITORING & REASSIGNMENT
   // ============================================================================
@@ -470,6 +597,11 @@ export class AdminService {
         include: {
           partner: { select: { id: true, partnerCode: true, businessName: true, category: true } },
           interestedCourse: { select: { id: true, name: true, feeAmount: true } },
+          assignments: {
+            where: { isCurrent: true },
+            include: { counsellor: { select: { id: true, fullName: true } } },
+            take: 1
+          },
           activities: {
             take: 1,
             orderBy: { createdAt: 'desc' },

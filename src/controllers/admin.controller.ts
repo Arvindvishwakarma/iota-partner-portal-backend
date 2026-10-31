@@ -137,6 +137,18 @@ export class AdminController {
     }
   }
 
+  async listVisits(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 25;
+
+      const result = await adminService.listAllVisits(req.query, page, limit);
+      res.status(200).json({ success: true, data: result.visits, stats: result.stats, meta: result.meta });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   // Lead Handlers
   async listLeads(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {

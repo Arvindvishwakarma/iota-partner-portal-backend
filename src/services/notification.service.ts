@@ -391,7 +391,7 @@ export class NotificationService {
     // Attempt re-dispatch
     return await this.sendNotification({
       userId: notif.userId,
-      channel: notif.channel,
+      channel: notif.channel as any,
       title: notif.title,
       message: notif.message,
       actionUrl: notif.actionUrl,

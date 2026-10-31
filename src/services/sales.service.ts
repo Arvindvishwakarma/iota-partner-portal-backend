@@ -462,7 +462,8 @@ export class SalesService {
           admission: {
             select: {
               admissionCode: true,
-              finalFee: true,
+              paidFee: true,
+              totalFee: true,
               commission: { select: { commissionAmount: true, status: true } }
             }
           }

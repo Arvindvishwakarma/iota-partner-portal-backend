@@ -31,9 +31,10 @@ router.get('/partners', adminController.listPartners);
 router.get('/partners/:id', adminController.getPartner);
 router.patch('/partners/:id/review', validateBody(partnerApprovalSchema), adminController.reviewPartner);
 
-// Premises Master Directory
+// Premises Master Directory & Field Visits
 router.get('/premises', adminController.listPremises);
 router.post('/premises', validateBody(createPremisesSchema), adminController.createPremises);
+router.get('/visits', adminController.listVisits);
 router.post('/visits/assign', validateBody(assignVisitSchema), adminController.assignVisit);
 router.post('/visits/bulk-assign', validateBody(bulkAssignVisitsSchema), adminController.bulkAssignVisits);
 

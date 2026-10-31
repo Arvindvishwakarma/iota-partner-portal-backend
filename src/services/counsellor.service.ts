@@ -231,7 +231,7 @@ export class CounsellorService {
             partnerCode: true,
             businessName: true,
             city: true,
-            phone: true
+            mobile: true
           }
         },
         interestedCourse: true,
@@ -260,12 +260,7 @@ export class CounsellorService {
           }
         },
         duplicateSubmissions: {
-          orderBy: { createdAt: 'desc' },
-          include: {
-            attemptedPartner: {
-              select: { partnerCode: true, businessName: true }
-            }
-          }
+          orderBy: { createdAt: 'desc' }
         }
       }
     });
