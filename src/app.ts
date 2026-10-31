@@ -72,3 +72,13 @@ export const createApp = (): Express => {
   return app;
 };
 
+// Instantiate default application instance
+const app = createApp();
+
+// Export as default function/server for Vercel Serverless Function & standard Node.js
+export default app;
+module.exports = app;
+module.exports.createApp = createApp;
+module.exports.default = app;
+
+
