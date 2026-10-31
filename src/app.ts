@@ -62,8 +62,10 @@ export const createApp = (): Express => {
   app.use('/health', healthRoutes);
   app.use('/api/health', healthRoutes);
 
-  // API v1 Router
+  // API Routes (mounted with /api/v1, /api, and root fallback for frontend flexibility)
   app.use('/api/v1', apiRouter);
+  app.use('/api', apiRouter);
+  app.use(apiRouter);
 
   // 404 & Error Handlers
   app.use(notFoundHandler);
