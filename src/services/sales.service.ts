@@ -187,25 +187,17 @@ export class SalesService {
       throw new AppError('Premises not found', 404, 'NOT_FOUND');
     }
 
-    // 3. Proximity Check (Haversine formula): <= 500m
+    // 3. Proximity Check (Optional, GPS tracking removed per user specification)
     let calculatedDistance: number | null = null;
-    if (premises.latitude && premises.longitude) {
+    if (premises.latitude && premises.longitude && data.latitude && data.longitude) {
       calculatedDistance = calculateHaversineDistanceMeters(
         data.latitude,
         data.longitude,
         premises.latitude,
         premises.longitude
       );
-
-      if (calculatedDistance > MAX_VISIT_PROXIMITY_METERS) {
-        throw new AppError(
-          `GPS Verification Failed: You are ${calculatedDistance} meters away from ${premises.premisesName}. Check-in is only permitted within ${MAX_VISIT_PROXIMITY_METERS} meters.`,
-          400,
-          'PROXIMITY_CHECK_FAILED'
-        );
-      }
-    } else {
-      // If premises does not have GPS coordinates yet, record the rep's coordinates as the verified location!
+    } else if (data.latitude && data.longitude) {
+      // If premises does not have GPS coordinates yet, record the rep's coordinates
       await prisma.premises.update({
         where: { id: premisesId },
         data: {
@@ -213,7 +205,6 @@ export class SalesService {
           longitude: data.longitude
         }
       });
-      calculatedDistance = 0;
     }
 
     // 4. Find existing ASSIGNED visit or create a new visit record in IN_PROGRESS
@@ -276,14 +267,6 @@ export class SalesService {
       throw new AppError('You are not authorized to check out of this visit', 403, 'FORBIDDEN');
     }
 
-    if (visit.status !== VisitStatus.IN_PROGRESS) {
-      throw new AppError(
-        `Cannot check out of visit with status '${visit.status}'. Visit must be 'IN_PROGRESS'.`,
-        400,
-        'INVALID_VISIT_STATUS'
-      );
-    }
-
     // Map premises status based on outcome
     let nextPremisesStatus: PremisesStatus = PremisesStatus.VISITED;
     if (data.status === VisitStatus.PARTNER_ONBOARDED) {
@@ -313,6 +296,79 @@ export class SalesService {
     });
 
     return updatedVisit;
+  }
+
+  /**
+   * Update Visit / Premises Status Directly (No GPS Required)
+   */
+  async updateVisitStatus(
+    salespersonId: string,
+    targetId: string,
+    data: {
+      status: VisitStatus;
+      remarks?: string;
+      scheduledDate?: string | null;
+      photoUrl?: string | null;
+    }
+  ) {
+    let visit = await prisma.premisesVisit.findFirst({
+      where: {
+        OR: [{ id: targetId }, { premisesId: targetId }]
+      },
+      orderBy: { createdAt: 'desc' },
+      include: { premises: true }
+    });
+
+    if (!visit) {
+      const premises = await prisma.premises.findUnique({ where: { id: targetId } });
+      if (!premises) {
+        throw new AppError('Premises not found', 404, 'NOT_FOUND');
+      }
+
+      visit = await prisma.premisesVisit.create({
+        data: {
+          premisesId: premises.id,
+          salespersonId,
+          status: data.status,
+          remarks: data.remarks || null,
+          scheduledDate: data.scheduledDate ? new Date(data.scheduledDate) : null,
+          visitedAt: new Date()
+        },
+        include: { premises: true }
+      });
+    }
+
+    let nextPremisesStatus: PremisesStatus = PremisesStatus.VISITED;
+    if (data.status === VisitStatus.PARTNER_ONBOARDED) {
+      nextPremisesStatus = PremisesStatus.PARTNER_ONBOARDED;
+    } else if (data.status === VisitStatus.NOT_INTERESTED) {
+      nextPremisesStatus = PremisesStatus.NOT_INTERESTED;
+    } else if (data.status === VisitStatus.ASSIGNED || data.status === VisitStatus.RESCHEDULED) {
+      nextPremisesStatus = PremisesStatus.ASSIGNED;
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const v = await tx.premisesVisit.update({
+        where: { id: visit!.id },
+        data: {
+          status: data.status,
+          remarks: data.remarks !== undefined ? data.remarks : visit!.remarks,
+          photoUrl: data.photoUrl || visit!.photoUrl,
+          visitedAt: new Date(),
+          scheduledDate: data.scheduledDate ? new Date(data.scheduledDate) : visit!.scheduledDate
+        },
+        include: { premises: true }
+      });
+
+      await tx.premises.update({
+        where: { id: visit!.premisesId },
+        data: { currentStatus: nextPremisesStatus }
+      });
+
+      return v;
+    });
+
+    return updated;
   }
 
   /**

@@ -6,7 +6,8 @@ import { Role } from '../shared';
 import {
   checkInSchema,
   checkOutSchema,
-  onboardPartnerSchema
+  onboardPartnerSchema,
+  updateVisitStatusSchema
 } from '../validators/sales.validator';
 
 const router = Router();
@@ -20,7 +21,18 @@ router.get('/dashboard', (req, res, next) => salesController.getDashboard(req, r
 // Assigned premises directory
 router.get('/premises', (req, res, next) => salesController.getPremises(req, res, next));
 
-// GPS Check-In at premises
+// Direct premises/visit status update (No GPS check required)
+router.post('/visits/:id/status', validateBody(updateVisitStatusSchema), (req, res, next) =>
+  salesController.updateStatus(req, res, next)
+);
+router.patch('/visits/:id/status', validateBody(updateVisitStatusSchema), (req, res, next) =>
+  salesController.updateStatus(req, res, next)
+);
+router.post('/premises/:id/status', validateBody(updateVisitStatusSchema), (req, res, next) =>
+  salesController.updateStatus(req, res, next)
+);
+
+// GPS Check-In at premises (non-blocking)
 router.post('/visits/:premisesId/check-in', validateBody(checkInSchema), (req, res, next) =>
   salesController.checkIn(req, res, next)
 );

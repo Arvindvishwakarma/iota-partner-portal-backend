@@ -59,6 +59,21 @@ export class SalesController {
     }
   }
 
+  async updateStatus(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const salespersonId = req.user!.userId;
+      const { id } = req.params;
+      const visit = await salesService.updateVisitStatus(salespersonId, id, req.body);
+      res.status(200).json({
+        success: true,
+        data: visit,
+        message: 'Premises visit status updated successfully.'
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async onboardPartner(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const salespersonId = req.user!.userId;

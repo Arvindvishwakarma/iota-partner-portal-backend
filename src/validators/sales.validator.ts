@@ -2,26 +2,23 @@ import { z } from 'zod';
 import { PartnerCategory, VisitStatus } from '../shared';
 
 export const checkInSchema = z.object({
-  latitude: z.number().min(-90).max(90),
-  longitude: z.number().min(-180).max(180),
-  accuracyMeters: z.number().optional()
+  latitude: z.number().min(-90).max(90).optional().nullable(),
+  longitude: z.number().min(-180).max(180).optional().nullable(),
+  accuracyMeters: z.number().optional().nullable()
 });
 
-export const checkOutSchema = z.object({
-  status: z.enum([
-    VisitStatus.COMPLETED,
-    VisitStatus.INTERESTED,
-    VisitStatus.NOT_INTERESTED,
-    VisitStatus.FOLLOW_UP_REQUIRED,
-    VisitStatus.PARTNER_ONBOARDED,
-    VisitStatus.INVALID_CONTACT
-  ], {
-    errorMap: () => ({ message: 'Valid visit outcome status is required' })
-  }),
-  remarks: z.string().min(3, 'Visit outcome notes must be at least 3 characters').max(1000),
-  photoUrl: z.string().url().optional().nullable(),
-  scheduledDate: z.string().datetime().optional().nullable()
+export const updateVisitStatusSchema = z.object({
+  status: z.nativeEnum(VisitStatus),
+  remarks: z.string().optional().default(''),
+  photoUrl: z.string().optional().nullable(),
+  scheduledDate: z
+    .string()
+    .refine((val) => !val || !isNaN(Date.parse(val)), { message: 'Invalid next visit date format' })
+    .optional()
+    .nullable()
 });
+
+export const checkOutSchema = updateVisitStatusSchema;
 
 export const onboardPartnerSchema = z.object({
   premisesId: z.string().uuid().optional().nullable(),
