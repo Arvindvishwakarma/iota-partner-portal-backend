@@ -23,7 +23,7 @@ prisma.$on('error', (e: any) => {
   logger.error('Prisma Error:', e);
 });
 
-if (process.env.NODE_ENV !== 'production') {
+if (!global.__prisma) {
   global.__prisma = prisma;
 }
 

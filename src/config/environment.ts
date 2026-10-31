@@ -37,8 +37,9 @@ const envSchema = z.object({
 const parseResult = envSchema.safeParse(process.env);
 
 if (!parseResult.success) {
-  console.error('❌ Invalid backend environment configuration:', parseResult.error.format());
-  process.exit(1);
+  const formatted = JSON.stringify(parseResult.error.format(), null, 2);
+  console.error('❌ Invalid backend environment configuration:', formatted);
+  throw new Error(`Invalid backend environment configuration. Missing or invalid variables in Vercel settings: ${formatted}`);
 }
 
 export const env = parseResult.data;

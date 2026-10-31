@@ -48,6 +48,16 @@ export const createApp = (): Express => {
   app.use(cookieParser());
   app.use(requestLogger);
 
+  // Root Status Endpoint
+  app.get('/', (req, res) => {
+    res.json({
+      status: 'UP',
+      message: 'IOTA Partner Portal Backend API is active',
+      version: '1.0.0',
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // Base Health Checks
   app.use('/health', healthRoutes);
   app.use('/api/health', healthRoutes);
