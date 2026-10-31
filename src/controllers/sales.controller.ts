@@ -59,6 +59,17 @@ export class SalesController {
     }
   }
 
+  async getVisit(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const salespersonId = req.user!.userId;
+      const { id } = req.params;
+      const data = await salesService.getVisitDetails(salespersonId, id);
+      res.status(200).json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async updateStatus(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const salespersonId = req.user!.userId;

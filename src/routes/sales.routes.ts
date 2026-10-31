@@ -21,6 +21,11 @@ router.get('/dashboard', (req, res, next) => salesController.getDashboard(req, r
 // Assigned premises directory
 router.get('/premises', (req, res, next) => salesController.getPremises(req, res, next));
 
+// Get visit / premises console details (by visit ID or premises ID)
+router.get('/visit/:id', (req, res, next) => salesController.getVisit(req, res, next));
+router.get('/visits/:id', (req, res, next) => salesController.getVisit(req, res, next));
+router.get('/premises/:id', (req, res, next) => salesController.getVisit(req, res, next));
+
 // Direct premises/visit status update (No GPS check required)
 router.post('/visits/:id/status', validateBody(updateVisitStatusSchema), (req, res, next) =>
   salesController.updateStatus(req, res, next)

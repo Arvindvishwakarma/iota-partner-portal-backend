@@ -62,7 +62,13 @@ export class SalesService {
       prisma.premisesVisit.findMany({
         where: {
           ...baseWhere,
-          status: { in: [VisitStatus.ASSIGNED, VisitStatus.IN_PROGRESS] }
+          status: {
+            in: [
+              VisitStatus.ASSIGNED,
+              VisitStatus.IN_PROGRESS,
+              VisitStatus.RESCHEDULED
+            ]
+          }
         },
         include: {
           premises: true
@@ -78,7 +84,11 @@ export class SalesService {
               VisitStatus.COMPLETED,
               VisitStatus.INTERESTED,
               VisitStatus.NOT_INTERESTED,
-              VisitStatus.PARTNER_ONBOARDED
+              VisitStatus.PARTNER_ONBOARDED,
+              VisitStatus.AUTHORIZED_PERSON_NOT_AVAILABLE,
+              VisitStatus.PREMISES_CLOSED_TEMPORARY,
+              VisitStatus.PREMISES_CLOSED_PERMANENTLY,
+              VisitStatus.WRONG_ADDRESS
             ]
           }
         }
@@ -101,7 +111,9 @@ export class SalesService {
     return {
       metrics: {
         assignedPremisesCount,
-        todayRemaining: todayVisits.filter((v) => v.status === VisitStatus.ASSIGNED).length,
+        todayRemaining: todayVisits.filter(
+          (v) => v.status === VisitStatus.ASSIGNED || v.status === VisitStatus.RESCHEDULED
+        ).length,
         completedVisitsCount,
         onboardedPartnersCount
       },
@@ -369,6 +381,49 @@ export class SalesService {
     });
 
     return updated;
+  }
+
+  /**
+   * Get Visit or Premises Details for Sales Update Console
+   */
+  async getVisitDetails(salespersonId: string, targetId: string) {
+    const visit = await prisma.premisesVisit.findFirst({
+      where: {
+        OR: [{ id: targetId }, { premisesId: targetId }]
+      },
+      orderBy: { createdAt: 'desc' },
+      include: { premises: true }
+    });
+
+    if (visit) {
+      return {
+        id: visit.id,
+        status: visit.status,
+        scheduledDate: visit.scheduledDate,
+        remarks: visit.remarks,
+        photoUrl: visit.photoUrl,
+        visitedAt: visit.visitedAt,
+        premises: visit.premises
+      };
+    }
+
+    const premises = await prisma.premises.findUnique({
+      where: { id: targetId }
+    });
+
+    if (!premises) {
+      throw new AppError('Premises or visit not found', 404, 'NOT_FOUND');
+    }
+
+    return {
+      id: null,
+      status: VisitStatus.ASSIGNED,
+      scheduledDate: null,
+      remarks: null,
+      photoUrl: null,
+      visitedAt: null,
+      premises
+    };
   }
 
   /**
