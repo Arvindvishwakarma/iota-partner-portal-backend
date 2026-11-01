@@ -308,9 +308,9 @@ export class AdminService {
       });
 
       for (const p of unlinkedOnboardedPremises) {
-        const rawPhone = p.mobile.replace(/\D/g, '');
-        const normalizedMobile = p.mobile.startsWith('+91')
-          ? p.mobile
+        const rawPhone = p.contactNumber.replace(/\D/g, '');
+        const normalizedMobile = p.contactNumber.startsWith('+91')
+          ? p.contactNumber
           : `+91${rawPhone}`;
         const email = `${rawPhone || p.id.slice(0, 8)}@partner.iotaacademy.in`;
 
@@ -324,7 +324,7 @@ export class AdminService {
             data: {
               email,
               phone: normalizedMobile,
-              fullName: p.ownerName,
+              fullName: p.premisesName,
               passwordHash: defaultPasswordHash,
               role: Role.PARTNER,
               isActive: false
@@ -343,15 +343,15 @@ export class AdminService {
             partnerCode,
             businessName: p.premisesName,
             category: p.category,
-            ownerName: p.ownerName,
-            contactPerson: p.contactPerson || p.ownerName,
+            ownerName: p.premisesName,
+            contactPerson: p.premisesName,
             mobile: normalizedMobile,
             email,
-            addressLine1: p.addressLine1,
-            addressLine2: p.addressLine2,
-            city: p.city,
-            area: p.area,
-            pincode: p.pincode,
+            addressLine1: p.fullAddress,
+            addressLine2: null,
+            city: 'General',
+            area: 'General',
+            pincode: '560001',
             latitude: p.latitude,
             longitude: p.longitude,
             registrationUrl,
@@ -386,7 +386,7 @@ export class AdminService {
         where,
         include: {
           user: { select: { fullName: true, email: true, isActive: true } },
-          premises: { select: { id: true, premisesName: true, area: true } },
+          premises: { select: { id: true, premisesName: true, fullAddress: true } },
           _count: {
             select: {
               leads: true,
@@ -498,19 +498,17 @@ export class AdminService {
   // PREMISES MASTER DIRECTORY & ASSIGNMENTS
   // ============================================================================
 
-  async listPremises(status?: PremisesStatus, category?: PartnerCategory, search?: string, city?: string, page = 1, limit = 20) {
+  async listPremises(status?: PremisesStatus, category?: PartnerCategory, search?: string, _city?: string, page = 1, limit = 20) {
     const where: any = { deletedAt: null };
 
     if (status) where.currentStatus = status;
     if (category) where.category = category;
-    if (city) where.city = { equals: city, mode: 'insensitive' };
 
     if (search) {
       where.OR = [
         { premisesName: { contains: search, mode: 'insensitive' } },
-        { ownerName: { contains: search, mode: 'insensitive' } },
-        { area: { contains: search, mode: 'insensitive' } },
-        { mobile: { contains: search } }
+        { fullAddress: { contains: search, mode: 'insensitive' } },
+        { contactNumber: { contains: search } }
       ];
     }
 
@@ -544,18 +542,14 @@ export class AdminService {
       data: {
         premisesName: data.premisesName,
         category: data.category,
-        ownerName: data.ownerName,
-        contactPerson: data.contactPerson,
-        mobile: data.mobile,
-        altMobile: data.altMobile,
-        addressLine1: data.addressLine1,
-        addressLine2: data.addressLine2,
-        city: data.city,
-        area: data.area,
-        pincode: data.pincode,
-        latitude: data.latitude,
-        longitude: data.longitude,
-        assignedSalesId: data.assignedSalesId,
+        customCategory: data.customCategory || null,
+        contactNumber: data.contactNumber,
+        website: data.website || null,
+        googleMapUrl: data.googleMapUrl || null,
+        fullAddress: data.fullAddress,
+        latitude: data.latitude || null,
+        longitude: data.longitude || null,
+        assignedSalesId: data.assignedSalesId || null,
         currentStatus: data.assignedSalesId ? PremisesStatus.ASSIGNED : PremisesStatus.UNASSIGNED
       }
     });
@@ -657,11 +651,11 @@ export class AdminService {
               id: true,
               premisesName: true,
               category: true,
-              ownerName: true,
-              mobile: true,
-              addressLine1: true,
-              city: true,
-              area: true,
+              customCategory: true,
+              contactNumber: true,
+              website: true,
+              googleMapUrl: true,
+              fullAddress: true,
               latitude: true,
               longitude: true
             }

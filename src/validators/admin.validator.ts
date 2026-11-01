@@ -48,20 +48,16 @@ export const partnerApprovalSchema = z.object({
 
 // Premises Schema
 export const createPremisesSchema = z.object({
-  premisesName: z.string().min(2, 'Premises name is required').trim(),
+  premisesName: z.string().min(2, 'Premises business name is required').trim(),
   category: z.nativeEnum(PartnerCategory).default(PartnerCategory.COMPUTER_CENTER),
-  ownerName: z.string().min(2, 'Owner name is required').trim(),
-  contactPerson: z.string().optional(),
-  mobile: z.string().min(10, 'Valid phone number is required').trim(),
-  altMobile: z.string().optional(),
-  addressLine1: z.string().min(3, 'Address is required').trim(),
-  addressLine2: z.string().optional(),
-  city: z.string().min(2, 'City is required').trim(),
-  area: z.string().min(2, 'Area is required').trim(),
-  pincode: z.string().min(5, 'Valid pincode is required').trim(),
-  latitude: z.number().optional(),
-  longitude: z.number().optional(),
-  assignedSalesId: z.string().uuid().optional()
+  customCategory: z.string().optional().nullable(),
+  contactNumber: z.string().min(7, 'Valid contact number is required').trim(),
+  website: z.string().optional().nullable(),
+  googleMapUrl: z.string().optional().nullable(),
+  fullAddress: z.string().min(5, 'Full address is required').trim(),
+  latitude: z.number().optional().nullable(),
+  longitude: z.number().optional().nullable(),
+  assignedSalesId: z.string().uuid().optional().nullable()
 });
 
 export const bulkImportPremisesSchema = z.object({

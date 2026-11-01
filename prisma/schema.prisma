@@ -269,15 +269,11 @@ model Premises {
   id                  String           @id @default(uuid())
   premisesName        String           @map("premises_name")
   category            PartnerCategory  @default(COMPUTER_CENTER)
-  ownerName           String           @map("owner_name")
-  contactPerson       String?          @map("contact_person")
-  mobile              String           @map("mobile")
-  altMobile           String?          @map("alt_mobile")
-  addressLine1        String           @map("address_line1")
-  addressLine2        String?          @map("address_line2")
-  city                String           @map("city")
-  area                String           @map("area")
-  pincode             String           @map("pincode")
+  customCategory      String?          @map("custom_category")
+  contactNumber       String           @map("contact_number")
+  website             String?          @map("website")
+  googleMapUrl        String?          @map("google_map_url")
+  fullAddress         String           @map("full_address")
   latitude            Float?
   longitude           Float?
   currentStatus       PremisesStatus   @default(UNASSIGNED) @map("current_status")
@@ -289,7 +285,7 @@ model Premises {
   partner             Partner?
   visits              PremisesVisit[]
 
-  @@index([city, area, currentStatus])
+  @@index([currentStatus])
   @@index([assignedSalesId])
   @@map("premises")
 }

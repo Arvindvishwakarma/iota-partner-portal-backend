@@ -137,17 +137,12 @@ export class SalesService {
       where.currentStatus = filter.status;
     }
 
-    if (filter.city) {
-      where.city = { contains: filter.city, mode: 'insensitive' };
-    }
-
     if (filter.search) {
       const q = filter.search.trim();
       where.OR = [
         { premisesName: { contains: q, mode: 'insensitive' } },
-        { ownerName: { contains: q, mode: 'insensitive' } },
-        { area: { contains: q, mode: 'insensitive' } },
-        { mobile: { contains: q } }
+        { fullAddress: { contains: q, mode: 'insensitive' } },
+        { contactNumber: { contains: q } }
       ];
     }
 
@@ -389,9 +384,9 @@ export class SalesService {
           });
 
           if (prem) {
-            const rawPhone = prem.mobile.replace(/\D/g, '');
-            const normalizedMobile = prem.mobile.startsWith('+91')
-              ? prem.mobile
+            const rawPhone = prem.contactNumber.replace(/\D/g, '');
+            const normalizedMobile = prem.contactNumber.startsWith('+91')
+              ? prem.contactNumber
               : `+91${rawPhone}`;
             const email = `${rawPhone || prem.id.slice(0, 8)}@partner.iotaacademy.in`;
 
@@ -405,7 +400,7 @@ export class SalesService {
                 data: {
                   email,
                   phone: normalizedMobile,
-                  fullName: prem.ownerName,
+                  fullName: prem.premisesName,
                   passwordHash: defaultPasswordHash,
                   role: Role.PARTNER,
                   isActive: false // Inactive until Super Admin accepts approval
@@ -423,15 +418,15 @@ export class SalesService {
                 partnerCode,
                 businessName: prem.premisesName,
                 category: prem.category,
-                ownerName: prem.ownerName,
-                contactPerson: prem.contactPerson || prem.ownerName,
+                ownerName: prem.premisesName,
+                contactPerson: prem.premisesName,
                 mobile: normalizedMobile,
                 email,
-                addressLine1: prem.addressLine1,
-                addressLine2: prem.addressLine2,
-                city: prem.city,
-                area: prem.area,
-                pincode: prem.pincode,
+                addressLine1: prem.fullAddress,
+                addressLine2: null,
+                city: 'General',
+                area: 'General',
+                pincode: '560001',
                 latitude: prem.latitude,
                 longitude: prem.longitude,
                 registrationUrl,
