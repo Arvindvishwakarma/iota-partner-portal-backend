@@ -36,6 +36,8 @@ router.put('/staff/:id', validateBody(updateStaffSchema), adminController.update
 router.get('/partners', adminController.listPartners);
 router.get('/partners/:id', adminController.getPartner);
 router.patch('/partners/:id/review', validateBody(partnerApprovalSchema), adminController.reviewPartner);
+router.patch('/partners/:id/password', validateBody(resetStaffPasswordSchema), adminController.resetPartnerPassword);
+router.post('/partners/:id/password', validateBody(resetStaffPasswordSchema), adminController.resetPartnerPassword);
 
 // Premises Master Directory & Field Visits
 router.get('/premises', adminController.listPremises);

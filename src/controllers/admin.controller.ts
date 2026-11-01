@@ -112,6 +112,21 @@ export class AdminController {
     }
   }
 
+  async resetPartnerPassword(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const { password } = req.body;
+      const result = await adminService.resetPartnerPassword(id, password);
+      res.status(200).json({
+        success: true,
+        data: { partnerId: id, email: result.email, updated: true },
+        message: 'Partner password updated successfully'
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   // Premises Handlers
   async listPremises(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {

@@ -285,6 +285,13 @@ export class AdminService {
     return { id: user.id, email: user.email, fullName: user.fullName, updated: true };
   }
 
+  async resetPartnerPassword(partnerId: string, newPassword: string) {
+    const partner = await prisma.partner.findUnique({ where: { id: partnerId } });
+    if (!partner) throw new AppError('Partner not found', 404, 'NOT_FOUND');
+    if (!partner.userId) throw new AppError('No login user account associated with this partner', 400, 'NO_USER');
+    return this.resetStaffPassword(partner.userId, newPassword);
+  }
+
   // ============================================================================
   // PARTNER MANAGEMENT
   // ============================================================================
