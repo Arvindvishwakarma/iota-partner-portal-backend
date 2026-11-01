@@ -153,11 +153,35 @@ export class AdminController {
     }
   }
 
+  async updatePremises(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const updated = await adminService.updatePremises(id, req.body);
+      res.status(200).json({ success: true, data: updated, message: 'Premises updated successfully' });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async assignVisit(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const { premisesId, salespersonId, scheduledDate } = req.body;
+      if (!salespersonId || salespersonId === 'UNASSIGN') {
+        const result = await adminService.unassignPremisesVisit(premisesId);
+        return res.status(200).json({ success: true, data: result, message: 'Premises unassigned successfully' });
+      }
       const visit = await adminService.assignPremisesVisit(premisesId, salespersonId, scheduledDate);
       res.status(200).json({ success: true, data: visit, message: 'Premises visit assigned successfully' });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async unassignVisit(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { premisesId } = req.body;
+      const result = await adminService.unassignPremisesVisit(premisesId);
+      res.status(200).json({ success: true, data: result, message: 'Premises unassigned successfully' });
     } catch (err) {
       next(err);
     }

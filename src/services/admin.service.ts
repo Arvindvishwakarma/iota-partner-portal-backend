@@ -519,9 +519,9 @@ export class AdminService {
         include: {
           partner: { select: { id: true, partnerCode: true, status: true } },
           visits: {
-            where: { status: { in: [VisitStatus.ASSIGNED, VisitStatus.IN_PROGRESS] } },
+            orderBy: { createdAt: 'desc' },
             take: 1,
-            include: { salesperson: { select: { id: true, fullName: true, phone: true } } }
+            include: { salesperson: { select: { id: true, fullName: true, phone: true, email: true } } }
           },
           _count: { select: { visits: true } }
         },
@@ -552,6 +552,28 @@ export class AdminService {
         assignedSalesId: data.assignedSalesId || null,
         currentStatus: data.assignedSalesId ? PremisesStatus.ASSIGNED : PremisesStatus.UNASSIGNED
       }
+    });
+  }
+
+  async updatePremises(id: string, data: any) {
+    const existing = await prisma.premises.findUnique({ where: { id } });
+    if (!existing) {
+      throw new AppError('Premises not found', 404, 'NOT_FOUND');
+    }
+
+    const updateData: any = {};
+    if (data.premisesName !== undefined) updateData.premisesName = data.premisesName;
+    if (data.category !== undefined) updateData.category = data.category;
+    if (data.customCategory !== undefined) updateData.customCategory = data.customCategory;
+    if (data.contactNumber !== undefined) updateData.contactNumber = data.contactNumber;
+    if (data.website !== undefined) updateData.website = data.website;
+    if (data.googleMapUrl !== undefined) updateData.googleMapUrl = data.googleMapUrl;
+    if (data.fullAddress !== undefined) updateData.fullAddress = data.fullAddress;
+    if (data.assignedSalesId !== undefined) updateData.assignedSalesId = data.assignedSalesId;
+
+    return prisma.premises.update({
+      where: { id },
+      data: updateData
     });
   }
 
@@ -609,6 +631,33 @@ export class AdminService {
     return result[0];
   }
 
+  async unassignPremisesVisit(premisesId: string) {
+    const premises = await prisma.premises.findUnique({ where: { id: premisesId } });
+    if (!premises) throw new AppError('Premises not found', 404, 'NOT_FOUND');
+
+    await prisma.$transaction([
+      prisma.premisesVisit.updateMany({
+        where: {
+          premisesId,
+          status: { in: [VisitStatus.ASSIGNED, VisitStatus.IN_PROGRESS] }
+        },
+        data: {
+          status: VisitStatus.CANCELLED,
+          remarks: 'Unassigned by administrator'
+        }
+      }),
+      prisma.premises.update({
+        where: { id: premisesId },
+        data: {
+          assignedSalesId: null,
+          currentStatus: PremisesStatus.UNASSIGNED
+        }
+      })
+    ]);
+
+    return { id: premisesId, currentStatus: PremisesStatus.UNASSIGNED, assignedSalesId: null };
+  }
+
   async bulkAssignVisits(premisesIds: string[], salespersonId: string, scheduledDate?: string) {
     const results = [];
     for (const premisesId of premisesIds) {
@@ -635,9 +684,10 @@ export class AdminService {
       const s = filters.search;
       where.OR = [
         { premises: { premisesName: { contains: s, mode: 'insensitive' } } },
-        { premises: { area: { contains: s, mode: 'insensitive' } } },
-        { premises: { city: { contains: s, mode: 'insensitive' } } },
-        { salesperson: { fullName: { contains: s, mode: 'insensitive' } } }
+        { premises: { fullAddress: { contains: s, mode: 'insensitive' } } },
+        { premises: { contactNumber: { contains: s } } },
+        { salesperson: { fullName: { contains: s, mode: 'insensitive' } } },
+        { remarks: { contains: s, mode: 'insensitive' } }
       ];
     }
 

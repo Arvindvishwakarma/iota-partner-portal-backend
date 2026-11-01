@@ -10,7 +10,9 @@ import {
   resetStaffPasswordSchema,
   partnerApprovalSchema,
   createPremisesSchema,
+  updatePremisesSchema,
   assignVisitSchema,
+  unassignVisitSchema,
   bulkAssignVisitsSchema,
   reassignLeadSchema
 } from '../validators/admin.validator';
@@ -42,8 +44,11 @@ router.post('/partners/:id/password', validateBody(resetStaffPasswordSchema), ad
 // Premises Master Directory & Field Visits
 router.get('/premises', adminController.listPremises);
 router.post('/premises', validateBody(createPremisesSchema), adminController.createPremises);
+router.patch('/premises/:id', validateBody(updatePremisesSchema), adminController.updatePremises);
+router.put('/premises/:id', validateBody(updatePremisesSchema), adminController.updatePremises);
 router.get('/visits', adminController.listVisits);
 router.post('/visits/assign', validateBody(assignVisitSchema), adminController.assignVisit);
+router.post('/visits/unassign', validateBody(unassignVisitSchema), adminController.unassignVisit);
 router.post('/visits/bulk-assign', validateBody(bulkAssignVisitsSchema), adminController.bulkAssignVisits);
 
 // Lead Monitoring & Reassignment
