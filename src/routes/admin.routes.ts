@@ -16,6 +16,7 @@ import {
   bulkAssignVisitsSchema,
   reassignLeadSchema
 } from '../validators/admin.validator';
+import { onboardPartnerSchema } from '../validators/sales.validator';
 
 const router = Router();
 
@@ -36,6 +37,9 @@ router.put('/staff/:id', validateBody(updateStaffSchema), adminController.update
 
 // Partner Management & KYC Review
 router.get('/partners', adminController.listPartners);
+router.post('/partners/onboard', validateBody(onboardPartnerSchema), (req, res, next) =>
+  adminController.onboardPartner(req, res, next)
+);
 router.get('/partners/:id', adminController.getPartner);
 router.patch('/partners/:id/review', validateBody(partnerApprovalSchema), adminController.reviewPartner);
 router.patch('/partners/:id/password', validateBody(resetStaffPasswordSchema), adminController.resetPartnerPassword);

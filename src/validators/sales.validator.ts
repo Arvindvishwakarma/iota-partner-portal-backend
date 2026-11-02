@@ -40,7 +40,8 @@ export const onboardPartnerSchema = z.object({
   bankAccountNumber: z.string().optional().nullable(),
   bankIfsc: z.string().optional().nullable(),
   bankName: z.string().optional().nullable(),
-  upiId: z.string().optional().nullable()
+  upiId: z.string().optional().nullable(),
+  onboardingFormImage: z.string().optional().nullable()
 });
 
 export type CheckInInput = z.infer<typeof checkInSchema>;

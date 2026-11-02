@@ -228,6 +228,7 @@ model Partner {
   bankIfsc            String?          @map("bank_ifsc")
   bankName            String?          @map("bank_name")
   upiId               String?          @map("upi_id")
+  onboardingFormImage String?          @map("onboarding_form_image")
   onboardedByUserId   String?          @map("onboarded_by_user_id")
   premisesId          String?          @unique @map("premises_id")
   approvedAt          DateTime?        @map("approved_at")

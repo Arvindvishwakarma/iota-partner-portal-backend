@@ -562,9 +562,29 @@ export class SalesService {
           bankAccountNumber: data.bankAccountNumber || null,
           bankIfsc: data.bankIfsc || null,
           bankName: data.bankName || null,
-          upiId: data.upiId || null
+          upiId: data.upiId || null,
+          onboardingFormImage: data.onboardingFormImage || null
         }
       });
+
+      // If an onboarding form image was provided, also record it in partner documents
+      if (data.onboardingFormImage) {
+        try {
+          await tx.partnerDocument.create({
+            data: {
+              partnerId: newPartner.id,
+              documentType: 'ONBOARDING_FORM',
+              fileUrl: data.onboardingFormImage,
+              originalName: 'onboarding-form.jpg',
+              mimeType: 'image/jpeg',
+              fileSize: Math.round((data.onboardingFormImage.length * 3) / 4),
+              isVerified: false
+            }
+          });
+        } catch (docErr) {
+          console.warn('Failed to create partner document record for onboarding form:', docErr);
+        }
+      }
 
       // If linked to a premises, update premises and active visit
       if (data.premisesId) {

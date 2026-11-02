@@ -1,5 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { adminService } from '../services/admin.service';
+import { salesService } from '../services/sales.service';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import { PartnerCategory, PartnerStatus, PremisesStatus, Role, VisitStatus } from '../shared';
 
@@ -121,6 +122,20 @@ export class AdminController {
         success: true,
         data: { partnerId: id, email: result.email, updated: true },
         message: 'Partner password updated successfully'
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async onboardPartner(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const adminId = req.user!.userId;
+      const partner = await salesService.onboardPartner(adminId, req.body);
+      res.status(201).json({
+        success: true,
+        data: partner,
+        message: `Partner '${partner.businessName}' onboarded successfully with Code ${partner.partnerCode}!`
       });
     } catch (err) {
       next(err);
