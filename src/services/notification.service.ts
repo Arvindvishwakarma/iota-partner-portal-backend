@@ -116,14 +116,13 @@ export class NotificationService {
     <div class="content">
       <h2 class="title">${title}</h2>
       <div class="message">${message}</div>
-      ${
-        actionUrl
-          ? `<a href="${actionUrl}" class="button" target="_blank">View Details in Portal</a>`
-          : ''
+      ${actionUrl
+        ? `<a href="${actionUrl}" class="button" target="_blank">View Details in Portal</a>`
+        : ''
       }
     </div>
     <div class="footer">
-      This is an automated operational notification from IOTA Academy, Bengaluru, Karnataka.<br>
+      This is an automated operational notification from IOTA Academy, Indore, Karnataka.<br>
       © 2026 IOTA Academy. All rights reserved.
     </div>
   </div>

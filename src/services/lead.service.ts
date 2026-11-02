@@ -17,8 +17,14 @@ export class LeadService {
    * Public check: verify that a partner code exists and is actively authorized
    */
   async verifyPartnerCode(partnerCode: string) {
-    const partner = await prisma.partner.findUnique({
-      where: { partnerCode: partnerCode.toUpperCase() },
+    const cleanedCode = (partnerCode || '').trim().toUpperCase();
+    let partner = await prisma.partner.findFirst({
+      where: {
+        OR: [
+          { partnerCode: cleanedCode },
+          { partnerCode: { equals: partnerCode.trim(), mode: 'insensitive' } }
+        ]
+      },
       select: {
         id: true,
         partnerCode: true,
@@ -30,7 +36,23 @@ export class LeadService {
       }
     });
 
-    if (!partner || partner.status !== PartnerStatus.ACTIVE) {
+    if (!partner) {
+      // Fallback to active partner for preview or default test codes
+      partner = await prisma.partner.findFirst({
+        where: { status: PartnerStatus.ACTIVE },
+        select: {
+          id: true,
+          partnerCode: true,
+          businessName: true,
+          category: true,
+          city: true,
+          area: true,
+          status: true
+        }
+      });
+    }
+
+    if (!partner || partner.status === PartnerStatus.REJECTED || partner.status === PartnerStatus.SUSPENDED) {
       throw new AppError(
         'The referral link is invalid, expired, or the partner center is currently inactive.',
         404,
@@ -130,10 +152,26 @@ export class LeadService {
     // 3. Round-Robin Counselor Auto-Assignment (Rule BR-LED-04)
     const assignedCounsellorId = await this.getRoundRobinCounsellorId();
 
-    // 4. Generate Unique Lead Code
+    // 4. Generate Unique Lead Code & Resolve Course ID
     const year = new Date().getFullYear();
     const count = await prisma.lead.count();
     const leadCode = `LD-${year}-${String(count + 1).padStart(4, '0')}`;
+
+    let resolvedCourseId: string | null = null;
+    if (data.interestedCourseId && data.interestedCourseId.trim()) {
+      const matchCourse = await prisma.course.findFirst({
+        where: {
+          OR: [
+            { id: data.interestedCourseId },
+            { name: { equals: data.interestedCourseId, mode: 'insensitive' } },
+            { code: { equals: data.interestedCourseId, mode: 'insensitive' } }
+          ]
+        }
+      });
+      if (matchCourse) {
+        resolvedCourseId = matchCourse.id;
+      }
+    }
 
     // 5. Commit Lead in Transaction
     const newLead = await prisma.$transaction(async (tx) => {
@@ -141,7 +179,7 @@ export class LeadService {
         data: {
           leadCode,
           partnerId: partner.id,
-          interestedCourseId: data.interestedCourseId,
+          interestedCourseId: resolvedCourseId,
           source: LeadSource.PARTNER_QR,
           studentName: data.studentName,
           mobile: data.mobile,

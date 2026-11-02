@@ -48,7 +48,7 @@ describe('Public Student Lead Intake & Validation API', () => {
       studentName: 'Aarav Patel',
       mobile: '12345', // invalid
       currentEducation: 'B.Tech 3rd Year',
-      city: 'Bengaluru',
+      city: 'Indore',
       preferredContactTime: 'MORNING_10AM_1PM',
       communicationConsent: true
     });
@@ -64,7 +64,7 @@ describe('Public Student Lead Intake & Validation API', () => {
       studentName: 'Aarav Patel',
       mobile: '9876543210',
       currentEducation: 'B.Tech 3rd Year',
-      city: 'Bengaluru',
+      city: 'Indore',
       communicationConsent: false // rejected
     });
 

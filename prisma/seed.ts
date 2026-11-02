@@ -60,32 +60,53 @@ async function main() {
   // 4. Seed Master Courses
   const coursesData = [
     {
-      code: 'FSWD-01',
-      name: 'Full Stack Web Development (MERN)',
-      description: 'Comprehensive industry program covering React, Node.js, Next.js, and cloud deployments.',
-      feeAmount: 35000.0,
+      code: 'DA-AI-01',
+      name: 'Data Analytics with AI',
+      description: 'Master data analysis, SQL, PowerBI, Python, and modern AI predictive tools.',
+      feeAmount: 30000.0,
       durationWeeks: 16
     },
     {
-      code: 'DSML-01',
-      name: 'Data Science & Machine Learning Pro',
-      description: 'Hands-on Python, SQL, Statistics, Scikit-learn, and Generative AI fundamentals.',
+      code: 'DS-AI-01',
+      name: 'Data Science with AI',
+      description: 'Comprehensive Python, Statistics, Machine Learning, Deep Learning, and Generative AI.',
+      feeAmount: 40000.0,
+      durationWeeks: 20
+    },
+    {
+      code: 'BA-AI-01',
+      name: 'Business Analytics with AI',
+      description: 'Strategic business decision making, KPIs, advanced dashboards, and AI automation.',
+      feeAmount: 32000.0,
+      durationWeeks: 14
+    },
+    {
+      code: 'ML-AI-01',
+      name: 'Machine Learning with AI',
+      description: 'Advanced supervised & unsupervised algorithms, PyTorch, TensorFlow, and AI model deployments.',
+      feeAmount: 42000.0,
+      durationWeeks: 18
+    },
+    {
+      code: 'AI-AI-01',
+      name: 'Artificial Intelligence with AI',
+      description: 'Core artificial intelligence architectures, LLMs, prompt engineering, and autonomous agents.',
       feeAmount: 45000.0,
       durationWeeks: 20
     },
     {
-      code: 'PYFS-01',
-      name: 'Python Full Stack Developer',
-      description: 'Core & Advanced Python, Django, PostgreSQL, and RESTful Microservices.',
-      feeAmount: 25000.0,
-      durationWeeks: 12
+      code: 'FSD-AI-01',
+      name: 'Full Stack Development with AI',
+      description: 'Full stack development with Next.js, Node.js, databases, and AI coding integration.',
+      feeAmount: 35000.0,
+      durationWeeks: 16
     },
     {
-      code: 'DMGM-01',
-      name: 'Digital Marketing & Growth Mastery',
-      description: 'SEO, Performance Marketing, Meta/Google Ads, Analytics, and Conversion Optimization.',
-      feeAmount: 20000.0,
-      durationWeeks: 10
+      code: 'GUIDANCE-01',
+      name: 'Not sure yet - need guidance',
+      description: 'Comprehensive curriculum counseling & personalized academic roadmap discussion.',
+      feeAmount: 0.0,
+      durationWeeks: 12
     }
   ];
 
@@ -141,10 +162,10 @@ async function main() {
         contactPerson: 'Suresh Reddy',
         mobile: '+919800000004',
         email: 'partner@iotaacademy.in',
-        addressLine1: '#42, 5th Cross, 2nd Main, Indiranagar',
-        city: 'Bengaluru',
-        area: 'Indiranagar',
-        pincode: '560038',
+        addressLine1: '',
+        city: 'Indore',
+        area: '',
+        pincode: '452001',
         latitude: 12.9716,
         longitude: 77.5946,
         status: PartnerStatus.ACTIVE,
@@ -169,7 +190,7 @@ async function main() {
           contactNumber: '+919811223344',
           website: 'https://indiratech.example.com',
           googleMapUrl: 'https://maps.google.com/?q=12.9784,77.6408',
-          fullAddress: '#108, CMH Road, Near Metro Station, Indiranagar, Bengaluru - 560038',
+          fullAddress: '',
           latitude: 12.9784,
           longitude: 77.6408,
           currentStatus: PremisesStatus.UNASSIGNED
@@ -180,7 +201,7 @@ async function main() {
           contactNumber: '+919822334455',
           website: 'https://brightfuture.example.com',
           googleMapUrl: 'https://maps.google.com/?q=12.9352,77.6245',
-          fullAddress: '#24, 80 Feet Road, 4th Block, Koramangala, Bengaluru - 560034',
+          fullAddress: '#24, 80 Feet Road, 4th Block, Koramangala, Indore - 560034',
           latitude: 12.9352,
           longitude: 77.6245,
           currentStatus: PremisesStatus.UNASSIGNED

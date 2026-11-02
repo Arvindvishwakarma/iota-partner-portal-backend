@@ -7,7 +7,6 @@ import { calculateHaversineDistanceMeters } from '../src/services/sales.service'
 
 describe('Haversine Distance Calculator Utility', () => {
   it('calculates accurate distance between known coordinates within meters', () => {
-    // Indiranagar Metro (12.9784, 77.6408) to MG Road Metro (12.9756, 77.6066) ~ 3.7 km
     const distance = calculateHaversineDistanceMeters(12.9784, 77.6408, 12.9756, 77.6066);
     expect(distance).toBeGreaterThan(3500);
     expect(distance).toBeLessThan(3900);
@@ -105,8 +104,8 @@ describe('Field Sales Module API & Proximity Guards', () => {
         email: 'invalid-email',
         mobile: '12345', // invalid
         addressLine1: 'MG Road',
-        city: 'Bengaluru',
-        area: 'Indiranagar',
+        city: 'Indore',
+        area: '',
         pincode: '123' // invalid
       });
 

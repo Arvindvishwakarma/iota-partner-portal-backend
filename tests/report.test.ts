@@ -10,7 +10,7 @@ describe('Report & Export Schema Validator Tests', () => {
     const valid = reportFilterSchema.safeParse({
       startDate: '2026-10-01',
       endDate: '2026-10-31',
-      city: 'Bengaluru'
+      city: 'Indore'
     });
     expect(valid.success).toBe(true);
   });
