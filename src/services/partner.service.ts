@@ -1,8 +1,20 @@
 import { prisma } from '../config/prisma';
 import { AppError } from '../middlewares/error.middleware';
 import { generateQrPngDataUrl, generateQrSvgString } from '../utils/qrcode';
-import { CommissionStatus, LeadStatus, SettlementStatus, TicketPriority } from '../shared';
+import {
+  CommissionStatus,
+  LeadStatus,
+  SettlementStatus,
+  TicketPriority,
+  PartnerStatus,
+  Role
+} from '../shared';
 import { env } from '../config/environment';
+import { hashPassword } from '../utils/password';
+import {
+  PublicPartnerRegisterInput,
+  mapCategoryToEnum
+} from '../validators/public-partner.validator';
 
 export class PartnerService {
   /**
@@ -262,6 +274,94 @@ export class PartnerService {
         priority: (data.priority as TicketPriority) || TicketPriority.MEDIUM
       }
     });
+  }
+
+  /**
+   * Public Partner Self-Registration from Landing Page
+   */
+  async registerPublicPartner(data: PublicPartnerRegisterInput) {
+    const normalizedMobile = data.phone.startsWith('+91') ? data.phone : `+91${data.phone}`;
+    const emailLower = data.email.trim().toLowerCase();
+
+    // 1. Check duplicate email or phone in user or partner records
+    const [existingUser, existingPartner] = await Promise.all([
+      prisma.user.findFirst({
+        where: { OR: [{ email: emailLower }, { phone: normalizedMobile }] }
+      }),
+      prisma.partner.findFirst({
+        where: { OR: [{ email: emailLower }, { mobile: normalizedMobile }] }
+      })
+    ]);
+
+    if (existingUser || existingPartner) {
+      throw new AppError(
+        'An affiliate account or application with this mobile number or email already exists. Our team will review your application shortly.',
+        400,
+        'DUPLICATE_AFFILIATE'
+      );
+    }
+
+    // 2. Generate a unique provisional Partner Code e.g. PTR-PENDING-KAR-0005
+    const stateClean = data.state.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || 'IND';
+    const count = await prisma.partner.count();
+    const codeNumber = (count + 1).toString().padStart(4, '0');
+    const partnerCode = `PTR-PENDING-${stateClean}-${codeNumber}`;
+
+    // 3. Hash default password for the partner's future portal access
+    const defaultPassword = 'Partner@123456';
+    const passwordHash = await hashPassword(defaultPassword);
+
+    const businessName = data.businessName?.trim() || data.fullName.trim();
+    const categoryEnum = mapCategoryToEnum(data.category);
+
+    const result = await prisma.$transaction(async (tx) => {
+      // Create user login account (inactive until admin reviews and approves)
+      const user = await tx.user.create({
+        data: {
+          email: emailLower,
+          phone: normalizedMobile,
+          fullName: data.fullName.trim(),
+          passwordHash,
+          role: Role.PARTNER,
+          isActive: false
+        }
+      });
+
+      const registrationUrl = `${env.FRONTEND_URL}/register/${partnerCode}`;
+
+      // Create partner record with PENDING_APPROVAL status
+      const partner = await tx.partner.create({
+        data: {
+          userId: user.id,
+          partnerCode,
+          businessName,
+          category: categoryEnum,
+          ownerName: data.fullName.trim(),
+          contactPerson: data.fullName.trim(),
+          mobile: normalizedMobile,
+          whatsapp: normalizedMobile,
+          email: emailLower,
+          addressLine1: data.address.trim(),
+          addressLine2: data.notes?.trim() || null,
+          city: data.state.trim(),
+          area: data.state.trim(),
+          pincode: data.pincode.trim(),
+          registrationUrl,
+          status: PartnerStatus.PENDING_APPROVAL
+        }
+      });
+
+      return { partner, user };
+    });
+
+    return {
+      partnerId: result.partner.id,
+      partnerCode: result.partner.partnerCode,
+      businessName: result.partner.businessName,
+      ownerName: result.partner.ownerName,
+      status: result.partner.status,
+      message: 'Affiliate application submitted successfully. Pending admin review.'
+    };
   }
 }
 
