@@ -26,7 +26,12 @@ export const createApp = (): Express => {
         // Allow requests with no origin (like mobile apps, curl, or server-to-server)
         if (!origin) return callback(null, true);
 
-        const allowed = [env.FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:3000'];
+        const allowed = [
+          env.FRONTEND_URL,
+          'https://affiliate.iotaacademy.in',
+          'http://localhost:3000',
+          'http://127.0.0.1:3000'
+        ];
         if (
           allowed.includes(origin) ||
           origin.endsWith('.vercel.app') ||

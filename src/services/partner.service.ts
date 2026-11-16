@@ -91,7 +91,7 @@ export class PartnerService {
       .filter((i) => i.status === CommissionStatus.PAID)
       .reduce((acc, item) => acc + (Number(item._sum.commissionAmount) || 0), 0);
 
-    const baseUrl = (env.FRONTEND_URL || 'https://iota-partner-portal-frontend.vercel.app').replace(/\/+$/, '');
+    const baseUrl = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
     const liveRegistrationUrl = `${baseUrl}/register/${partner.partnerCode}`;
 
     return {
@@ -128,7 +128,7 @@ export class PartnerService {
 
     if (!partner) throw new AppError('Partner not found', 404, 'NOT_FOUND');
 
-    const baseUrl = (env.FRONTEND_URL || 'https://iota-partner-portal-frontend.vercel.app').replace(/\/+$/, '');
+    const baseUrl = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
     const registrationUrl = `${baseUrl}/register/${partner.partnerCode}`;
 
     // Generate live PNG data URL & SVG string
@@ -280,25 +280,113 @@ export class PartnerService {
    * Public Partner Self-Registration from Landing Page
    */
   async registerPublicPartner(data: PublicPartnerRegisterInput) {
-    const normalizedMobile = data.phone.startsWith('+91') ? data.phone : `+91${data.phone}`;
-    const emailLower = data.email.trim().toLowerCase();
+    const fullName = (data.fullName || `${data.firstName || ''} ${data.lastName || ''}`).trim();
+    if (!fullName) {
+      throw new AppError('Full name is required', 400, 'INVALID_NAME');
+    }
 
-    // 1. Check duplicate email or phone in user or partner records
-    const [existingUser, existingPartner] = await Promise.all([
+    const cleanMobileDigits = data.phone.replace(/\D/g, '').slice(-10);
+    const normalizedMobile = `+91${cleanMobileDigits}`;
+
+    const rawWhatsapp = (data.whatsapp && data.whatsapp.trim()) || data.phone;
+    const cleanWhatsappDigits = rawWhatsapp.replace(/\D/g, '').slice(-10);
+    const normalizedWhatsapp = `+91${cleanWhatsappDigits}`;
+
+    const hasProvidedEmail = Boolean(data.email && data.email.trim());
+    const emailLower = hasProvidedEmail ? data.email!.trim().toLowerCase() : '';
+
+    // If no email entered, the username is the 10-digit phone number without +91
+    const username = hasProvidedEmail ? emailLower : cleanMobileDigits;
+    const userEmail = username;
+    const partnerEmail = username;
+
+    // 1. Check duplicate Phone Number in User or Partner records
+    const [existingPhoneUser, existingPhonePartner] = await Promise.all([
       prisma.user.findFirst({
-        where: { OR: [{ email: emailLower }, { phone: normalizedMobile }] }
+        where: {
+          OR: [
+            { phone: cleanMobileDigits },
+            { phone: normalizedMobile },
+            { phone: { endsWith: cleanMobileDigits } },
+            { email: cleanMobileDigits }
+          ],
+          deletedAt: null
+        }
       }),
       prisma.partner.findFirst({
-        where: { OR: [{ email: emailLower }, { mobile: normalizedMobile }] }
+        where: {
+          OR: [
+            { mobile: cleanMobileDigits },
+            { mobile: normalizedMobile },
+            { mobile: { endsWith: cleanMobileDigits } }
+          ],
+          deletedAt: null
+        }
       })
     ]);
 
-    if (existingUser || existingPartner) {
+    if (existingPhoneUser || existingPhonePartner) {
       throw new AppError(
-        'An affiliate account or application with this mobile number or email already exists. Our team will review your application shortly.',
-        400,
-        'DUPLICATE_AFFILIATE'
+        `An affiliate account with Phone Number '${cleanMobileDigits}' already exists. Please login to your dashboard or contact support.`,
+        409,
+        'DUPLICATE_PHONE'
       );
+    }
+
+    // 2. Check duplicate WhatsApp Number in Partner and User records
+    const [existingWhatsappPartner, existingWhatsappUser] = await Promise.all([
+      prisma.partner.findFirst({
+        where: {
+          OR: [
+            { whatsapp: cleanWhatsappDigits },
+            { whatsapp: normalizedWhatsapp },
+            { whatsapp: { endsWith: cleanWhatsappDigits } },
+            { mobile: cleanWhatsappDigits },
+            { mobile: normalizedWhatsapp },
+            { mobile: { endsWith: cleanWhatsappDigits } }
+          ],
+          deletedAt: null
+        }
+      }),
+      prisma.user.findFirst({
+        where: {
+          OR: [
+            { phone: cleanWhatsappDigits },
+            { phone: normalizedWhatsapp },
+            { phone: { endsWith: cleanWhatsappDigits } },
+            { email: cleanWhatsappDigits }
+          ],
+          deletedAt: null
+        }
+      })
+    ]);
+
+    if (existingWhatsappPartner || existingWhatsappUser) {
+      throw new AppError(
+        `An affiliate account with WhatsApp Number '${cleanWhatsappDigits}' already exists. Please enter a different WhatsApp number.`,
+        409,
+        'DUPLICATE_WHATSAPP'
+      );
+    }
+
+    // 3. Check duplicate Email in User and Partner records (if email was provided)
+    if (hasProvidedEmail) {
+      const [existingEmailUser, existingEmailPartner] = await Promise.all([
+        prisma.user.findFirst({
+          where: { email: { equals: emailLower, mode: 'insensitive' }, deletedAt: null }
+        }),
+        prisma.partner.findFirst({
+          where: { email: { equals: emailLower, mode: 'insensitive' }, deletedAt: null }
+        })
+      ]);
+
+      if (existingEmailUser || existingEmailPartner) {
+        throw new AppError(
+          `An affiliate account with Email '${emailLower}' already exists. Please sign in or use a different email address.`,
+          409,
+          'DUPLICATE_EMAIL'
+        );
+      }
     }
 
     // 2. Generate a unique provisional Partner Code e.g. PTR-PENDING-KAR-0005
@@ -311,23 +399,33 @@ export class PartnerService {
     const defaultPassword = 'Partner@123456';
     const passwordHash = await hashPassword(defaultPassword);
 
-    const businessName = data.businessName?.trim() || data.fullName.trim();
+    const isIndividual = data.category === 'Individual (No Business)' || data.category.toLowerCase().includes('individual');
+    const businessName = isIndividual ? `${fullName} (Individual)` : (data.businessName?.trim() || fullName);
     const categoryEnum = mapCategoryToEnum(data.category);
+
+    const displayCategory = data.otherBusiness?.trim()
+      ? `Other: ${data.otherBusiness.trim()}`
+      : data.category.trim();
+
+    const addressLine1 = (data.address && data.address.trim())
+      ? data.address.trim()
+      : (isIndividual ? `Individual / Personal (${data.state.trim()})` : data.state.trim());
 
     const result = await prisma.$transaction(async (tx) => {
       // Create user login account (inactive until admin reviews and approves)
       const user = await tx.user.create({
         data: {
-          email: emailLower,
-          phone: normalizedMobile,
-          fullName: data.fullName.trim(),
+          email: userEmail,
+          phone: cleanMobileDigits,
+          fullName,
           passwordHash,
           role: Role.PARTNER,
           isActive: false
         }
       });
 
-      const registrationUrl = `${env.FRONTEND_URL}/register/${partnerCode}`;
+      const frontendBase = env.FRONTEND_URL || 'https://affiliate.iotaacademy.in';
+      const registrationUrl = `${frontendBase}/register/${partnerCode}`;
 
       // Create partner record with PENDING_APPROVAL status
       const partner = await tx.partner.create({
@@ -336,12 +434,12 @@ export class PartnerService {
           partnerCode,
           businessName,
           category: categoryEnum,
-          ownerName: data.fullName.trim(),
-          contactPerson: data.fullName.trim(),
-          mobile: normalizedMobile,
-          whatsapp: normalizedMobile,
-          email: emailLower,
-          addressLine1: data.address.trim(),
+          ownerName: fullName,
+          contactPerson: displayCategory, // Stores human-readable category & custom business
+          mobile: cleanMobileDigits,
+          whatsapp: cleanWhatsappDigits,
+          email: partnerEmail,
+          addressLine1,
           addressLine2: data.notes?.trim() || null,
           city: data.state.trim(),
           area: data.state.trim(),

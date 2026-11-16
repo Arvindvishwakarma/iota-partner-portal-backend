@@ -52,13 +52,13 @@ describe('Notification Service Template Generators Unit Tests', () => {
     const html = notificationService.renderEmailTemplate(
       'Admission Approved',
       'Your admission for Full Stack AI has been verified.',
-      'https://partners.iotaacademy.in/admin/admissions'
+      'https://affiliate.iotaacademy.in/admin/admissions'
     );
 
     expect(html).toContain('<!DOCTYPE html>');
     expect(html).toContain('Admission Approved');
     expect(html).toContain('Your admission for Full Stack AI has been verified.');
-    expect(html).toContain('https://partners.iotaacademy.in/admin/admissions');
+    expect(html).toContain('https://affiliate.iotaacademy.in/admin/admissions');
   });
 });
 

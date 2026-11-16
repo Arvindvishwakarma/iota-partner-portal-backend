@@ -37,7 +37,7 @@ export const authenticateJwt = async (
     next();
   } catch (err: any) {
     if (err.name === 'TokenExpiredError') {
-      return next(new AppError('Access token has expired. Please refresh your session.', 401, 'TOKEN_EXPIRED'));
+      return next(new AppError('Session expired. Please log in again.', 401, 'TOKEN_EXPIRED'));
     }
     return next(new AppError('Invalid authentication token.', 401, 'INVALID_TOKEN'));
   }

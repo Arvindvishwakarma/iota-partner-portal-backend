@@ -39,7 +39,7 @@ async function main() {
       area: 'Indiranagar',
       pincode: '560038',
       status: PartnerStatus.ACTIVE,
-      registrationUrl: 'http://localhost:3000/register/PTR-BLR-0001'
+      registrationUrl: 'https://affiliate.iotaacademy.in/register/PTR-BLR-0001'
     }
   });
 

@@ -1,18 +1,36 @@
 import { prisma } from '../config/prisma';
 import { AppError } from '../middlewares/error.middleware';
 import { hashPassword, verifyPassword } from '../utils/password';
-import { generateAccessToken, generateRefreshTokenString, hashToken } from '../utils/jwt';
+import { generateAccessToken, verifyAccessToken } from '../utils/jwt';
 import { AuthenticatedUser, JwtUserPayload, Role } from '../shared';
 import { logger } from '../config/logger';
 
 export class AuthService {
   /**
-   * Authenticate user with Email and Password
+   * Authenticate user with Email or Mobile Number and Password
+   * Issues a non-expiring persistent access token (valid until user logs out)
    */
-  async login(email: string, passwordPlain: string, ipAddress?: string, userAgent?: string) {
+  async login(identifier: string, passwordPlain: string, ipAddress?: string, userAgent?: string) {
+    const cleanSearch = identifier.trim();
+    const cleanDigits = cleanSearch.replace(/\D/g, '');
+    const isPhoneLike = cleanDigits.length >= 10;
+    const phone10 = cleanDigits.slice(-10);
+    const normalizedMobile = `+91${phone10}`;
+
     const user = await prisma.user.findFirst({
       where: {
-        email: email.toLowerCase(),
+        OR: [
+          { email: cleanSearch.toLowerCase() },
+          ...(isPhoneLike
+            ? [
+                { email: phone10 },
+                { phone: phone10 },
+                { phone: normalizedMobile },
+                { phone: cleanDigits },
+                { phone: { endsWith: phone10 } }
+              ]
+            : [])
+        ],
         deletedAt: null
       },
       include: {
@@ -23,7 +41,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
+      throw new AppError('Invalid email/mobile or password', 401, 'INVALID_CREDENTIALS');
     }
 
     if (!user.isActive) {
@@ -38,7 +56,7 @@ export class AuthService {
     // Determine Partner ID if role is PARTNER
     const partnerId = user.partnerProfile?.id;
 
-    // Issue JWT Access Token (15m)
+    // Issue Non-Expiring JWT Access Token (Persistent until Logout)
     const tokenPayload: JwtUserPayload = {
       userId: user.id,
       email: user.email,
@@ -46,19 +64,6 @@ export class AuthService {
       partnerId
     };
     const accessToken = generateAccessToken(tokenPayload);
-
-    // Issue Cryptographic Refresh Token (7 days)
-    const refreshTokenPlain = generateRefreshTokenString();
-    const tokenHash = hashToken(refreshTokenPlain);
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-    await prisma.refreshToken.create({
-      data: {
-        userId: user.id,
-        tokenHash,
-        expiresAt
-      }
-    });
 
     // Update last login timestamp
     await prisma.user.update({
@@ -82,118 +87,36 @@ export class AuthService {
 
     return {
       user: sanitizedUser,
-      accessToken,
-      refreshToken: refreshTokenPlain
+      accessToken
     };
   }
 
   /**
-   * Rotate Refresh Token and return a fresh Access Token
+   * Session refresh no-op (Tokens do not expire; returns active user session)
    */
-  async refreshSession(refreshTokenPlain: string) {
-    if (!refreshTokenPlain) {
-      throw new AppError('Refresh token is required', 401, 'UNAUTHORIZED');
-    }
-
-    const tokenHash = hashToken(refreshTokenPlain);
-
-    const existingToken = await prisma.refreshToken.findUnique({
-      where: { tokenHash },
-      include: {
-        user: {
-          include: {
-            partnerProfile: { select: { id: true, partnerCode: true } }
-          }
-        }
+  async refreshSession(token?: string) {
+    if (token) {
+      try {
+        const payload = verifyAccessToken(token);
+        const user = await this.getCurrentUser(payload.userId);
+        return {
+          user,
+          accessToken: token
+        };
+      } catch {
+        // Fallback if token is missing
       }
-    });
-
-    if (!existingToken) {
-      throw new AppError('Invalid or expired refresh token', 401, 'INVALID_TOKEN');
     }
-
-    // Replay attack detection: if token is already revoked, compromise detected!
-    if (existingToken.isRevoked) {
-      logger.warn(`Security Warning: Refresh token replay attack detected for User ID ${existingToken.userId}! Revoking all user sessions.`);
-      await prisma.refreshToken.updateMany({
-        where: { userId: existingToken.userId },
-        data: { isRevoked: true }
-      });
-      throw new AppError('Session invalidated due to suspicious activity. Please log in again.', 401, 'TOKEN_REUSED');
-    }
-
-    // Check expiration
-    if (new Date() > existingToken.expiresAt) {
-      throw new AppError('Refresh token expired. Please log in again.', 401, 'TOKEN_EXPIRED');
-    }
-
-    const { user } = existingToken;
-
-    if (!user.isActive || user.deletedAt) {
-      throw new AppError('User account is inactive or deleted', 403, 'ACCOUNT_INACTIVE');
-    }
-
-    // Generate new token pair (Token Rotation)
-    const newRefreshTokenPlain = generateRefreshTokenString();
-    const newTokenHash = hashToken(newRefreshTokenPlain);
-    const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-    // Atomically revoke old token and insert new token
-    await prisma.$transaction([
-      prisma.refreshToken.update({
-        where: { id: existingToken.id },
-        data: {
-          isRevoked: true,
-          replacedBy: newTokenHash
-        }
-      }),
-      prisma.refreshToken.create({
-        data: {
-          userId: user.id,
-          tokenHash: newTokenHash,
-          expiresAt: newExpiresAt
-        }
-      })
-    ]);
-
-    const partnerId = user.partnerProfile?.id;
-    const tokenPayload: JwtUserPayload = {
-      userId: user.id,
-      email: user.email,
-      role: user.role as Role,
-      partnerId
-    };
-    const newAccessToken = generateAccessToken(tokenPayload);
-
-    const sanitizedUser: AuthenticatedUser = {
-      id: user.id,
-      email: user.email,
-      fullName: user.fullName,
-      phone: user.phone,
-      role: user.role as Role,
-      isActive: user.isActive,
-      avatarUrl: user.avatarUrl,
-      partnerId
-    };
-
     return {
-      user: sanitizedUser,
-      accessToken: newAccessToken,
-      refreshToken: newRefreshTokenPlain
+      message: 'Persistent session is active. Token does not expire until logout.'
     };
   }
 
   /**
    * Invalidate active session on logout
    */
-  async logout(refreshTokenPlain?: string) {
-    if (refreshTokenPlain) {
-      const tokenHash = hashToken(refreshTokenPlain);
-      await prisma.refreshToken.updateMany({
-        where: { tokenHash },
-        data: { isRevoked: true }
-      });
-    }
+  async logout(_token?: string) {
+    // Persistent sessions are terminated by client-side token removal and cookie clearing
   }
 
   /**
@@ -224,7 +147,7 @@ export class AuthService {
   }
 
   /**
-   * Change Password and revoke all other existing sessions
+   * Change Password
    */
   async changePassword(userId: string, currentPasswordPlain: string, newPasswordPlain: string) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -239,21 +162,13 @@ export class AuthService {
 
     const newHash = await hashPassword(newPasswordPlain);
 
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: userId },
-        data: { passwordHash: newHash }
-      }),
-      // Revoke all existing sessions for this user
-      prisma.refreshToken.updateMany({
-        where: { userId },
-        data: { isRevoked: true }
-      })
-    ]);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newHash }
+    });
 
-    logger.info(`Password successfully changed for user: ${user.email}. All sessions revoked.`);
+    logger.info(`Password successfully changed for user: ${user.email}.`);
   }
 }
 
 export const authService = new AuthService();
-

@@ -8,7 +8,7 @@ import { INDIAN_PHONE_REGEX, PartnerCategory } from '../shared';
 export function mapCategoryToEnum(cat?: string | null): PartnerCategory {
   if (!cat) return PartnerCategory.OTHER;
   const lower = cat.toLowerCase();
-  if (lower.includes('book') || lower.includes('stationery') || lower.includes('cafe')) {
+  if (lower.includes('stationery') || lower.includes('book') || lower.includes('cafe')) {
     return PartnerCategory.BOOKSTORE_OR_CAFE;
   }
   if (lower.includes('library')) {
@@ -23,36 +23,41 @@ export function mapCategoryToEnum(cat?: string | null): PartnerCategory {
   if (lower.includes('coaching') || lower.includes('tuition')) {
     return PartnerCategory.COACHING_INSTITUTE;
   }
-  if (lower.includes('education') || lower.includes('school') || lower.includes('college')) {
+  if (lower.includes('tutor') || lower.includes('education') || lower.includes('school') || lower.includes('college')) {
     return PartnerCategory.EDUCATIONAL_INSTITUTE;
   }
   return PartnerCategory.OTHER;
 }
 
 export const publicPartnerRegisterSchema = z.object({
-  fullName: z
-    .string({ required_error: 'Full name is required' })
-    .min(2, 'Full name must be at least 2 characters')
-    .max(100, 'Full name must be under 100 characters')
-    .trim(),
+  firstName: z.string().max(60).optional().nullable(),
+  lastName: z.string().max(60).optional().nullable(),
+  fullName: z.string().max(120).optional().nullable(),
   phone: z
-    .string({ required_error: 'WhatsApp / Mobile number is required' })
+    .string({ required_error: 'Phone number is required' })
     .transform(normalizeIndianPhone)
     .refine((val) => INDIAN_PHONE_REGEX.test(val), {
       message: 'Please enter a valid 10-digit Indian mobile number (e.g., 9876543210 or +919876543210)'
     }),
+  whatsapp: z
+    .string()
+    .transform(normalizeIndianPhone)
+    .refine((val) => !val || INDIAN_PHONE_REGEX.test(val), {
+      message: 'Please enter a valid 10-digit WhatsApp number'
+    })
+    .optional()
+    .nullable(),
   email: z
-    .string({ required_error: 'Email address is required' })
+    .string()
+    .trim()
     .email('Please enter a valid email address')
-    .toLowerCase()
-    .trim(),
-  category: z.string().optional().default('Other Business Owner'),
+    .optional()
+    .or(z.literal(''))
+    .nullable(),
+  category: z.string({ required_error: 'Category is required' }).min(1),
+  otherBusiness: z.string().max(150).optional().nullable(),
   businessName: z.string().max(150).optional().nullable(),
-  address: z
-    .string({ required_error: 'Full address is required' })
-    .min(5, 'Full address must be at least 5 characters')
-    .max(300, 'Address must be under 300 characters')
-    .trim(),
+  address: z.string().max(300).optional().nullable(),
   state: z
     .string({ required_error: 'State is required' })
     .min(2, 'State is required')
@@ -65,4 +70,3 @@ export const publicPartnerRegisterSchema = z.object({
 });
 
 export type PublicPartnerRegisterInput = z.infer<typeof publicPartnerRegisterSchema>;
-

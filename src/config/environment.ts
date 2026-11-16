@@ -8,15 +8,15 @@ dotenv.config();
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.string().default('5000').transform((val) => parseInt(val, 10)),
-  FRONTEND_URL: z.string().default('http://localhost:3000'),
+  FRONTEND_URL: z.string().default('https://affiliate.iotaacademy.in'),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   DIRECT_URL: z.string().optional(),
 
   JWT_ACCESS_SECRET: z.string().min(16, 'JWT_ACCESS_SECRET must be at least 16 characters'),
-  JWT_REFRESH_SECRET: z.string().min(16, 'JWT_REFRESH_SECRET must be at least 16 characters'),
-  ACCESS_TOKEN_EXPIRY: z.string().default('15m'),
-  REFRESH_TOKEN_EXPIRY: z.string().default('7d'),
+  JWT_REFRESH_SECRET: z.string().optional().default(''),
+  ACCESS_TOKEN_EXPIRY: z.string().optional().default(''),
+  REFRESH_TOKEN_EXPIRY: z.string().optional().default(''),
 
   // Optional Third-Party Services
   WHATSAPP_ACCESS_TOKEN: z.string().optional().default(''),

@@ -8,7 +8,7 @@ import { Role } from '../src/shared';
 
 describe('QR Code Generation Engine', () => {
   it('generates high-resolution PNG Data URL for partner registration link', async () => {
-    const testUrl = 'https://partners.iotaacademy.in/register/PTR-BLR-0001';
+    const testUrl = 'https://affiliate.iotaacademy.in/register/PTR-BLR-0001';
     const pngDataUrl = await generateQrPngDataUrl(testUrl);
 
     expect(pngDataUrl).toBeDefined();
@@ -16,7 +16,7 @@ describe('QR Code Generation Engine', () => {
   });
 
   it('generates scalable SVG vector string for printable posters', async () => {
-    const testUrl = 'https://partners.iotaacademy.in/register/PTR-BLR-0001';
+    const testUrl = 'https://affiliate.iotaacademy.in/register/PTR-BLR-0001';
     const svg = await generateQrSvgString(testUrl);
 
     expect(svg).toBeDefined();

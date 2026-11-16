@@ -42,7 +42,7 @@ async function main() {
   });
   console.log(`✅ Counselor created: ${counsellor.email}`);
 
-  // 3. Seed Field Sales Representative
+  // 3. Business Development Executive
   const sales = await prisma.user.upsert({
     where: { email: 'sales@iotaacademy.in' },
     update: {},
@@ -169,7 +169,7 @@ async function main() {
         latitude: 12.9716,
         longitude: 77.5946,
         status: PartnerStatus.ACTIVE,
-        registrationUrl: 'https://iota-partner-portal-frontend.vercel.app/register/PTR-BLR-0001',
+        registrationUrl: 'https://affiliate.iotaacademy.in/register/PTR-BLR-0001',
         bankAccountName: 'Apex Education Center',
         bankName: 'HDFC Bank',
         bankIfsc: 'HDFC0001234',

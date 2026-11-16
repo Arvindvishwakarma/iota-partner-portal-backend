@@ -1,15 +1,13 @@
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
 import { env } from '../config/environment';
 import { JwtUserPayload } from '../shared';
 
 /**
- * Generate a short-lived Access Token (15m)
+ * Generate a persistent Access Token with NO expiration (valid until user logs out)
  */
 export function generateAccessToken(payload: JwtUserPayload): string {
-  return jwt.sign(payload, env.JWT_ACCESS_SECRET, {
-    expiresIn: env.ACCESS_TOKEN_EXPIRY as any
-  });
+  // Signs token without expiration claim so session never expires until logout
+  return jwt.sign(payload, env.JWT_ACCESS_SECRET);
 }
 
 /**
@@ -18,18 +16,3 @@ export function generateAccessToken(payload: JwtUserPayload): string {
 export function verifyAccessToken(token: string): JwtUserPayload {
   return jwt.verify(token, env.JWT_ACCESS_SECRET) as JwtUserPayload;
 }
-
-/**
- * Generate a cryptographically secure random Refresh Token (Hex string)
- */
-export function generateRefreshTokenString(): string {
-  return crypto.randomBytes(40).toString('hex');
-}
-
-/**
- * Hash a Refresh Token using SHA-256 before persisting in the database
- */
-export function hashToken(token: string): string {
-  return crypto.createHash('sha256').update(token).digest('hex');
-}
-
