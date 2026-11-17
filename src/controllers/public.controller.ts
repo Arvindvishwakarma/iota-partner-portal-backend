@@ -58,7 +58,7 @@ export class PublicController {
 
       try {
         const admins = await prisma.user.findMany({
-          where: { role: 'ADMIN', status: 'ACTIVE' },
+          where: { role: 'ADMIN', isActive: true },
           select: { id: true }
         });
         if (admins.length > 0) {
