@@ -482,6 +482,53 @@ export class SettlementService {
   }
 
   /**
+   * Admin Approve a Pending Settlement Request
+   */
+  async approveSettlement(adminUserId: string, settlementId: string) {
+    const settlement = await prisma.settlement.findUnique({
+      where: { id: settlementId },
+      include: { partner: true }
+    });
+
+    if (!settlement) {
+      throw new AppError('Settlement batch not found', 404, 'NOT_FOUND');
+    }
+
+    if (settlement.status !== SettlementStatus.PENDING_APPROVAL) {
+      throw new AppError(
+        `Settlement must be in PENDING_APPROVAL status to approve. Current status: ${settlement.status}`,
+        400,
+        'INVALID_STATUS'
+      );
+    }
+
+    const updated = await prisma.settlement.update({
+      where: { id: settlementId },
+      data: {
+        status: SettlementStatus.APPROVED,
+        approvedByUserId: adminUserId,
+        approvedAt: new Date()
+      },
+      include: { partner: true }
+    });
+
+    // Notify Partner
+    if (settlement.partner?.userId) {
+      await prisma.notification.create({
+        data: {
+          userId: settlement.partner.userId,
+          title: 'Withdrawal Request Approved',
+          message: `Your payment withdrawal request (${settlement.settlementCode}) of ₹${Number(settlement.netPaidAmount).toLocaleString('en-IN')} has been approved by admin. Disbursal will be processed shortly.`,
+          channel: 'IN_APP',
+          actionUrl: '/partner/settlements'
+        }
+      });
+    }
+
+    return updated;
+  }
+
+  /**
    * Overall Financial Summary KPIs
    */
   async getStats() {

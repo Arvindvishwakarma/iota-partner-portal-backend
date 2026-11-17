@@ -34,6 +34,9 @@ router.post('/generate-batch', validateBody(generateSettlementBatchSchema), (req
 router.post('/:id/disburse', validateBody(disburseSettlementSchema), (req, res, next) =>
   settlementController.disburseSettlement(req, res, next)
 );
+router.patch('/:id/approve', (req, res, next) =>
+  settlementController.approveSettlement(req, res, next)
+);
 router.post('/evaluate-cooling-off', (req, res, next) =>
   settlementController.evaluateCoolingOff(req, res, next)
 );

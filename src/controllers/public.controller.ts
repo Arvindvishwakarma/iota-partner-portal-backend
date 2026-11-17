@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { leadService } from '../services/lead.service';
 import { partnerService } from '../services/partner.service';
+import { prisma } from '../config/prisma';
 
 export class PublicController {
   async verifyPartner(req: Request, res: Response, next: NextFunction) {
@@ -42,6 +43,43 @@ export class PublicController {
         success: true,
         data: result,
         message: 'Your affiliate application has been submitted successfully! Our team will contact you shortly to activate your dashboard.'
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async submitContactMessage(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { name, email, phone, category, subject, message } = req.body;
+      const refCode = `INQ-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      console.log(`[Contact Inquiry ${refCode}] From: ${name} (${email}, ${phone}) | Category: ${category} | Subject: ${subject}`);
+
+      try {
+        const admins = await prisma.user.findMany({
+          where: { role: 'ADMIN', status: 'ACTIVE' },
+          select: { id: true }
+        });
+        if (admins.length > 0) {
+          await prisma.notification.createMany({
+            data: admins.map((a) => ({
+              userId: a.id,
+              title: `New Inquiry [${refCode}]: ${subject}`,
+              message: `${name} (${phone}, ${email}) submitted an inquiry under "${category}": ${message.slice(0, 150)}...`,
+              type: 'SYSTEM',
+              isRead: false
+            }))
+          });
+        }
+      } catch (logErr) {
+        console.warn('Could not persist admin notification for inquiry:', logErr);
+      }
+
+      res.status(200).json({
+        success: true,
+        data: { referenceCode: refCode },
+        message: 'Thank you! Your message has been received. Our team will get back to you shortly.'
       });
     } catch (err) {
       next(err);

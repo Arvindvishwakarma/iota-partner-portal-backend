@@ -4,6 +4,7 @@ import { authenticateJwt, requireRole } from '../middlewares/auth.middleware';
 import { validateBody } from '../middlewares/validate.middleware';
 import { Role } from '../shared';
 import { createSupportTicketSchema } from '../validators/public-lead.validator';
+import { requestWithdrawalSchema } from '../validators/settlement.validator';
 
 const router = Router();
 
@@ -16,6 +17,8 @@ router.get('/qr', partnerController.getQrAssets.bind(partnerController));
 router.get('/leads', partnerController.getLeads.bind(partnerController));
 router.get('/commissions', partnerController.getCommissions.bind(partnerController));
 router.get('/settlements', partnerController.getSettlements.bind(partnerController));
+router.post('/withdraw', validateBody(requestWithdrawalSchema), partnerController.requestWithdrawal.bind(partnerController));
+router.post('/settlements/withdraw', validateBody(requestWithdrawalSchema), partnerController.requestWithdrawal.bind(partnerController));
 router.post('/tickets', validateBody(createSupportTicketSchema), partnerController.createTicket.bind(partnerController));
 
 export default router;

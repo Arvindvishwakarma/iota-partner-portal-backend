@@ -102,6 +102,21 @@ export class SettlementController {
     }
   }
 
+  async approveSettlement(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const adminUserId = req.user!.userId;
+      const { id } = req.params;
+      const result = await settlementService.approveSettlement(adminUserId, id);
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: `Settlement request ${result.settlementCode} approved for payout.`
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async getStats(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const stats = await settlementService.getStats();

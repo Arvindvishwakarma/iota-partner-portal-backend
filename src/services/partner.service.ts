@@ -1,13 +1,16 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { AppError } from '../middlewares/error.middleware';
 import { generateQrPngDataUrl, generateQrSvgString } from '../utils/qrcode';
 import {
+  AdmissionStatus,
   CommissionStatus,
   LeadStatus,
   SettlementStatus,
   TicketPriority,
   PartnerStatus,
-  Role
+  Role,
+  STUDENT_REFUND_WINDOW_DAYS
 } from '../shared';
 import { env } from '../config/environment';
 import { hashPassword } from '../utils/password';
@@ -15,6 +18,7 @@ import {
   PublicPartnerRegisterInput,
   mapCategoryToEnum
 } from '../validators/public-partner.validator';
+import { RequestWithdrawalInput } from '../validators/settlement.validator';
 
 export class PartnerService {
   /**
@@ -27,20 +31,44 @@ export class PartnerService {
         id: true,
         partnerCode: true,
         businessName: true,
+        ownerName: true,
         status: true,
         city: true,
-        registrationUrl: true
+        registrationUrl: true,
+        bankAccountName: true,
+        bankAccountNumber: true,
+        bankIfsc: true,
+        bankName: true,
+        upiId: true
       }
     });
 
     if (!partner) throw new AppError('Partner not found', 404, 'NOT_FOUND');
+
+    // Auto promote cooling-off commissions
+    const fourteenDaysAgo = new Date(Date.now() - STUDENT_REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    await prisma.partnerCommission.updateMany({
+      where: {
+        partnerId,
+        status: CommissionStatus.PENDING,
+        settlementId: null,
+        admission: {
+          status: AdmissionStatus.VERIFIED,
+          admissionDate: { lte: fourteenDaysAgo }
+        }
+      },
+      data: {
+        status: CommissionStatus.ELIGIBLE
+      }
+    });
 
     const [
       totalLeads,
       todayLeads,
       admissionsCount,
       commissionsAgg,
-      recentLeads
+      recentLeads,
+      activeSettlement
     ] = await Promise.all([
       prisma.lead.count({ where: { partnerId } }),
       prisma.lead.count({
@@ -75,6 +103,22 @@ export class PartnerService {
         },
         orderBy: { createdAt: 'desc' },
         take: 5
+      }),
+      prisma.settlement.findFirst({
+        where: {
+          partnerId,
+          status: { in: [SettlementStatus.PENDING_APPROVAL, SettlementStatus.APPROVED] }
+        },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          settlementCode: true,
+          totalAmount: true,
+          netPaidAmount: true,
+          status: true,
+          createdAt: true,
+          notes: true
+        }
       })
     ]);
 
@@ -85,6 +129,14 @@ export class PartnerService {
 
     const pendingCommission = commissionsAgg
       .filter((i) => i.status === CommissionStatus.PENDING || i.status === CommissionStatus.ELIGIBLE)
+      .reduce((acc, item) => acc + (Number(item._sum.commissionAmount) || 0), 0);
+
+    const withdrawableCommission = commissionsAgg
+      .filter((i) => i.status === CommissionStatus.ELIGIBLE)
+      .reduce((acc, item) => acc + (Number(item._sum.commissionAmount) || 0), 0);
+
+    const processingCommission = commissionsAgg
+      .filter((i) => i.status === CommissionStatus.PROCESSING)
       .reduce((acc, item) => acc + (Number(item._sum.commissionAmount) || 0), 0);
 
     const paidCommission = commissionsAgg
@@ -105,10 +157,225 @@ export class PartnerService {
         admissionsCount,
         totalCommission,
         pendingCommission,
+        withdrawableCommission,
+        processingCommission,
         paidCommission
       },
+      activeSettlement,
       recentLeads
     };
+  }
+
+  /**
+   * Partner Requests Commission Withdrawal
+   */
+  async requestWithdrawal(partnerId: string, input: RequestWithdrawalInput) {
+    const partner = await prisma.partner.findUnique({
+      where: { id: partnerId }
+    });
+
+    if (!partner) throw new AppError('Partner not found', 404, 'NOT_FOUND');
+
+    if (partner.status !== PartnerStatus.ACTIVE) {
+      throw new AppError('Only active approved partners can request payment withdrawals', 403, 'FORBIDDEN');
+    }
+
+    // Check if partner already has a pending or approved settlement awaiting payout
+    const activeSettlement = await prisma.settlement.findFirst({
+      where: {
+        partnerId,
+        status: { in: [SettlementStatus.PENDING_APPROVAL, SettlementStatus.APPROVED] }
+      }
+    });
+
+    if (activeSettlement) {
+      throw new AppError(
+        `You already have an active withdrawal request (${activeSettlement.settlementCode}) of ₹${Number(activeSettlement.netPaidAmount).toLocaleString('en-IN')} pending admin processing.`,
+        400,
+        'ACTIVE_REQUEST_EXISTS'
+      );
+    }
+
+    // Update partner bank or UPI details if provided
+    const bankUpdates: any = {};
+    if (input.bankAccountName?.trim()) bankUpdates.bankAccountName = input.bankAccountName.trim();
+    if (input.bankAccountNumber?.trim()) bankUpdates.bankAccountNumber = input.bankAccountNumber.trim();
+    if (input.bankIfsc?.trim()) bankUpdates.bankIfsc = input.bankIfsc.trim().toUpperCase();
+    if (input.bankName?.trim()) bankUpdates.bankName = input.bankName.trim();
+    if (input.upiId?.trim()) bankUpdates.upiId = input.upiId.trim().toLowerCase();
+
+    if (Object.keys(bankUpdates).length > 0) {
+      await prisma.partner.update({
+        where: { id: partnerId },
+        data: bankUpdates
+      });
+    }
+
+    const currentPartner = await prisma.partner.findUnique({ where: { id: partnerId } });
+    const hasBank = !!(currentPartner?.bankAccountNumber && currentPartner?.bankIfsc);
+    const hasUpi = !!currentPartner?.upiId;
+
+    if (!hasBank && !hasUpi) {
+      throw new AppError(
+        'Please provide bank account details (Account Number & IFSC) or a valid UPI ID for payout transfer.',
+        400,
+        'BANK_DETAILS_REQUIRED'
+      );
+    }
+
+    // Auto promote cooling-off commissions
+    const fourteenDaysAgo = new Date(Date.now() - STUDENT_REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    await prisma.partnerCommission.updateMany({
+      where: {
+        partnerId,
+        status: CommissionStatus.PENDING,
+        settlementId: null,
+        admission: {
+          status: AdmissionStatus.VERIFIED,
+          admissionDate: { lte: fourteenDaysAgo }
+        }
+      },
+      data: {
+        status: CommissionStatus.ELIGIBLE
+      }
+    });
+
+    // Find eligible commissions
+    let eligibleCommissions = await prisma.partnerCommission.findMany({
+      where: {
+        partnerId,
+        status: CommissionStatus.ELIGIBLE,
+        settlementId: null
+      },
+      include: {
+        admission: { select: { admissionCode: true, admissionDate: true, status: true } }
+      }
+    });
+
+    if (eligibleCommissions.length === 0) {
+      // Check for any pending commissions on verified admissions
+      const verifiedPending = await prisma.partnerCommission.findMany({
+        where: {
+          partnerId,
+          status: CommissionStatus.PENDING,
+          settlementId: null,
+          admission: { status: AdmissionStatus.VERIFIED }
+        },
+        include: {
+          admission: { select: { admissionCode: true, admissionDate: true, status: true } }
+        }
+      });
+
+      if (verifiedPending.length > 0) {
+        // Promote verified admissions to ELIGIBLE on partner withdrawal request
+        await prisma.partnerCommission.updateMany({
+          where: { id: { in: verifiedPending.map(c => c.id) } },
+          data: { status: CommissionStatus.ELIGIBLE }
+        });
+        eligibleCommissions = verifiedPending;
+      } else {
+        const anyCommissions = await prisma.partnerCommission.count({
+          where: { partnerId, settlementId: null }
+        });
+        if (anyCommissions === 0) {
+          throw new AppError(
+            'You currently have ₹0 in eligible commissions to withdraw. Refer students to earn commissions upon confirmed admission.',
+            400,
+            'NO_ELIGIBLE_COMMISSIONS'
+          );
+        } else {
+          throw new AppError(
+            'Your admissions are currently awaiting administrative verification. Commissions become withdrawable once admissions are verified.',
+            400,
+            'COMMISSIONS_PENDING_VERIFICATION'
+          );
+        }
+      }
+    }
+
+    const totalAmount = eligibleCommissions.reduce(
+      (sum, c) => sum.add(new Prisma.Decimal(c.commissionAmount)),
+      new Prisma.Decimal(0)
+    );
+
+    if (totalAmount.lessThanOrEqualTo(0)) {
+      throw new AppError('Eligible commission amount must be greater than zero', 400, 'INVALID_AMOUNT');
+    }
+
+    const timestamp = Date.now().toString().slice(-4);
+    const suffix = Math.floor(100 + Math.random() * 900);
+    const settlementCode = `WTH-2026-${timestamp}${suffix}`;
+
+    const earliestDate = eligibleCommissions.reduce((earliest, c) => {
+      const d = new Date(c.createdAt);
+      return d < earliest ? d : earliest;
+    }, new Date());
+
+    const settlement = await prisma.$transaction(async (tx) => {
+      const newSettlement = await tx.settlement.create({
+        data: {
+          settlementCode,
+          partnerId,
+          totalAmount,
+          adjustmentAmount: new Prisma.Decimal(0),
+          netPaidAmount: totalAmount,
+          status: SettlementStatus.PENDING_APPROVAL,
+          periodStartDate: earliestDate,
+          periodEndDate: new Date(),
+          notes: input.notes
+            ? `[Partner Withdrawal Request] ${input.notes}`
+            : `Withdrawal requested by ${currentPartner?.businessName} via partner dashboard.`
+        }
+      });
+
+      await tx.partnerCommission.updateMany({
+        where: { id: { in: eligibleCommissions.map((c) => c.id) } },
+        data: {
+          settlementId: newSettlement.id,
+          status: CommissionStatus.PROCESSING
+        }
+      });
+
+      // Notify all Admin users
+      const admins = await tx.user.findMany({
+        where: { role: Role.ADMIN },
+        select: { id: true }
+      });
+
+      for (const admin of admins) {
+        await tx.notification.create({
+          data: {
+            userId: admin.id,
+            title: 'New Payment Withdrawal Request',
+            message: `${currentPartner?.businessName} (${currentPartner?.partnerCode}) requested a payment withdrawal of ₹${Number(totalAmount).toLocaleString('en-IN')}. Batch ${settlementCode} is awaiting admin approval.`,
+            channel: 'IN_APP',
+            actionUrl: '/admin/settlements'
+          }
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          userId: currentPartner?.userId,
+          action: 'PAYMENT_WITHDRAWAL_REQUESTED',
+          entityType: 'SETTLEMENT',
+          entityId: newSettlement.id,
+          newValues: {
+            settlementCode,
+            partnerId,
+            partnerCode: currentPartner?.partnerCode,
+            businessName: currentPartner?.businessName,
+            netPaidAmount: totalAmount.toString(),
+            commissionsCount: eligibleCommissions.length,
+            notes: input.notes
+          }
+        }
+      });
+
+      return newSettlement;
+    });
+
+    return settlement;
   }
 
   /**
@@ -399,13 +666,31 @@ export class PartnerService {
     const defaultPassword = 'Partner@123456';
     const passwordHash = await hashPassword(defaultPassword);
 
-    const isIndividual = data.category === 'Individual (No Business)' || data.category.toLowerCase().includes('individual');
-    const businessName = isIndividual ? `${fullName} (Individual)` : (data.businessName?.trim() || fullName);
-    const categoryEnum = mapCategoryToEnum(data.category);
+    const chosenCategory = data.occupation?.trim() || data.category?.trim() || 'Individual';
+    const isIndividual = chosenCategory === 'Individual (No Business)' ||
+      chosenCategory.toLowerCase().includes('individual') ||
+      chosenCategory.toLowerCase().includes('student') ||
+      chosenCategory.toLowerCase().includes('influencer');
+    const businessName = isIndividual ? `${fullName} (${chosenCategory})` : (data.businessName?.trim() || fullName);
+    const categoryEnum = mapCategoryToEnum(chosenCategory);
 
     const displayCategory = data.otherBusiness?.trim()
       ? `Other: ${data.otherBusiness.trim()}`
-      : data.category.trim();
+      : chosenCategory;
+
+    // Build rich profile metadata for internal ops/admin review
+    const profileParts = [
+      `Occupation: ${displayCategory}`,
+      data.gender?.trim() ? `Gender: ${data.gender.trim()}` : null,
+      data.age ? `Age: ${data.age}` : null,
+    ].filter(Boolean);
+    const contactPersonInfo = profileParts.join(' | ');
+
+    const notesParts = [
+      data.socialLink?.trim() ? `Social: ${data.socialLink.trim()}` : null,
+      data.notes?.trim() ? `Notes: ${data.notes.trim()}` : null
+    ].filter(Boolean);
+    const addressLine2 = notesParts.length ? notesParts.join(' | ') : null;
 
     const addressLine1 = (data.address && data.address.trim())
       ? data.address.trim()
@@ -435,12 +720,12 @@ export class PartnerService {
           businessName,
           category: categoryEnum,
           ownerName: fullName,
-          contactPerson: displayCategory, // Stores human-readable category & custom business
+          contactPerson: contactPersonInfo, // Stores human-readable category, gender, age
           mobile: cleanMobileDigits,
           whatsapp: cleanWhatsappDigits,
           email: partnerEmail,
           addressLine1,
-          addressLine2: data.notes?.trim() || null,
+          addressLine2, // Stores social profile links and custom notes
           city: data.state.trim(),
           area: data.state.trim(),
           pincode: data.pincode.trim(),

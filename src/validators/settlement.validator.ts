@@ -37,8 +37,20 @@ export const disburseSettlementSchema = z.object({
   transactedAt: z.string().datetime().optional()
 });
 
+export const requestWithdrawalSchema = z.object({
+  amount: z.number().positive().optional(),
+  notes: z.string().max(500).optional(),
+  payoutMode: z.enum(['BANK', 'UPI']).optional(),
+  bankAccountName: z.string().max(100).optional(),
+  bankAccountNumber: z.string().max(50).optional(),
+  bankIfsc: z.string().max(20).optional(),
+  bankName: z.string().max(100).optional(),
+  upiId: z.string().max(100).optional()
+});
+
 export type VerifyAdmissionInput = z.infer<typeof verifyAdmissionSchema>;
 export type RefundAdmissionInput = z.infer<typeof refundAdmissionSchema>;
 export type GenerateSettlementBatchInput = z.infer<typeof generateSettlementBatchSchema>;
 export type DisburseSettlementInput = z.infer<typeof disburseSettlementSchema>;
+export type RequestWithdrawalInput = z.infer<typeof requestWithdrawalSchema>;
 

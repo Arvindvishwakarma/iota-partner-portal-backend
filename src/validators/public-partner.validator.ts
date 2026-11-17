@@ -8,6 +8,9 @@ import { INDIAN_PHONE_REGEX, PartnerCategory } from '../shared';
 export function mapCategoryToEnum(cat?: string | null): PartnerCategory {
   if (!cat) return PartnerCategory.OTHER;
   const lower = cat.toLowerCase();
+  if (lower.includes('influencer') || lower.includes('creator')) {
+    return PartnerCategory.OTHER;
+  }
   if (lower.includes('stationery') || lower.includes('book') || lower.includes('cafe')) {
     return PartnerCategory.BOOKSTORE_OR_CAFE;
   }
@@ -54,7 +57,11 @@ export const publicPartnerRegisterSchema = z.object({
     .optional()
     .or(z.literal(''))
     .nullable(),
-  category: z.string({ required_error: 'Category is required' }).min(1),
+  category: z.string().optional().nullable(),
+  occupation: z.string().max(100).optional().nullable(),
+  gender: z.string().max(30).optional().nullable(),
+  age: z.coerce.number().min(18, 'You must be at least 18 years old to apply').max(100).optional().nullable(),
+  socialLink: z.string().max(300).optional().nullable(),
   otherBusiness: z.string().max(150).optional().nullable(),
   businessName: z.string().max(150).optional().nullable(),
   address: z.string().max(300).optional().nullable(),

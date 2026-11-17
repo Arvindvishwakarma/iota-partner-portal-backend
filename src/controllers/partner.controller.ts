@@ -84,6 +84,20 @@ export class PartnerController {
       next(err);
     }
   }
+
+  async requestWithdrawal(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const partnerId = this.getPartnerId(req);
+      const settlement = await partnerService.requestWithdrawal(partnerId, req.body);
+      res.status(201).json({
+        success: true,
+        data: settlement,
+        message: `Payment withdrawal request submitted! Batch ${settlement.settlementCode} is under review.`
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const partnerController = new PartnerController();
