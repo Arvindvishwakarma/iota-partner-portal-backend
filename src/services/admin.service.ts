@@ -13,6 +13,7 @@ import {
   CommissionStatus
 } from '../shared';
 import { env } from '../config/environment';
+import { generateUniqueAffiliateCode, isLegacyProvisionalCode } from '../utils/affiliate-code';
 
 export class AdminService {
   /**
@@ -332,8 +333,9 @@ export class AdminService {
           });
         }
 
-        const partnerCode = `PTR-PENDING-${p.id.substring(0, 6).toUpperCase()}`;
-        const registrationUrl = `${env.FRONTEND_URL}/register/${partnerCode}`;
+        const partnerCode = await generateUniqueAffiliateCode();
+        const frontendBase = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
+        const registrationUrl = `${frontendBase}/register/${partnerCode}`;
         const salespersonId = p.visits?.[0]?.salespersonId || p.assignedSalesId || null;
 
         await prisma.partner.create({
@@ -418,7 +420,7 @@ export class AdminService {
       }
     });
 
-    if (!partner) throw new AppError('Partner profile not found', 404, 'NOT_FOUND');
+    if (!partner) throw new AppError('Affiliate profile not found', 404, 'NOT_FOUND');
     return partner;
   }
 
@@ -428,19 +430,17 @@ export class AdminService {
       include: { premises: true }
     });
 
-    if (!partner) throw new AppError('Partner not found', 404, 'NOT_FOUND');
+    if (!partner) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
 
     if (status === PartnerStatus.ACTIVE) {
-      // Deterministic unique partner code if not yet assigned
+      // Keep clean 6-char affiliate code; upgrade any legacy PTR/TEMP provisional codes
       let partnerCode = partner.partnerCode;
-      if (!partnerCode || partnerCode.startsWith('TEMP') || partnerCode.startsWith('PTR-PENDING')) {
-        const cityPrefix = (partner.city || 'BLR').substring(0, 3).toUpperCase();
-        const count = await prisma.partner.count({ where: { status: PartnerStatus.ACTIVE } });
-        const seq = String(count + 1).padStart(4, '0');
-        partnerCode = `PTR-${cityPrefix}-${seq}`;
+      if (isLegacyProvisionalCode(partnerCode)) {
+        partnerCode = await generateUniqueAffiliateCode();
       }
 
-      const registrationUrl = `${env.FRONTEND_URL}/register/${partnerCode}`;
+      const frontendBase = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
+      const registrationUrl = `${frontendBase}/register/${partnerCode}`;
 
       const updated = await prisma.$transaction(async (tx) => {
         // Activate user login account

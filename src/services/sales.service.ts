@@ -9,6 +9,7 @@ import {
 } from '../shared';
 import { hashPassword } from '../utils/password';
 import { env } from '../config/environment';
+import { generateUniqueAffiliateCode } from '../utils/affiliate-code';
 import {
   CheckInInput,
   CheckOutInput,
@@ -408,8 +409,9 @@ export class SalesService {
               });
             }
 
-            const partnerCode = `PTR-PENDING-${prem.id.substring(0, 6).toUpperCase()}`;
-            const registrationUrl = `${env.FRONTEND_URL}/register/${partnerCode}`;
+            const partnerCode = await generateUniqueAffiliateCode(tx);
+            const frontendBase = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
+            const registrationUrl = `${frontendBase}/register/${partnerCode}`;
 
             await tx.partner.create({
               data: {
@@ -504,17 +506,14 @@ export class SalesService {
 
     if (existingUser || existingPartner) {
       throw new AppError(
-        'A user or partner with this email or mobile phone number already exists',
+        'A user or affiliate with this email or mobile phone number already exists',
         400,
         'DUPLICATE_PARTNER'
       );
     }
 
-    // 2. Generate unique Partner Code e.g. PTR-BLR-0005
-    const cityPrefix = data.city.slice(0, 3).toUpperCase();
-    const count = await prisma.partner.count();
-    const codeNumber = (count + 1).toString().padStart(4, '0');
-    const partnerCode = `PTR-${cityPrefix}-${codeNumber}`;
+    // 2. Generate unique 6-character Affiliate Code e.g. 7K9M2X
+    const partnerCode = await generateUniqueAffiliateCode();
 
     // 3. Hash default password
     const defaultPassword = 'Partner@123456';

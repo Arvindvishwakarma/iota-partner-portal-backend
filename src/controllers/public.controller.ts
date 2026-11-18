@@ -67,8 +67,7 @@ export class PublicController {
               userId: a.id,
               title: `New Inquiry [${refCode}]: ${subject}`,
               message: `${name} (${phone}, ${email}) submitted an inquiry under "${category}": ${message.slice(0, 150)}...`,
-              type: 'SYSTEM',
-              isRead: false
+              actionUrl: '/admin/notifications'
             }))
           });
         }

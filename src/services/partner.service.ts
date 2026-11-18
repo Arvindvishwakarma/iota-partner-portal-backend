@@ -16,8 +16,10 @@ import { env } from '../config/environment';
 import { hashPassword } from '../utils/password';
 import {
   PublicPartnerRegisterInput,
-  mapCategoryToEnum
+  mapCategoryToEnum,
+  isIndividualOccupation
 } from '../validators/public-partner.validator';
+import { generateUniqueAffiliateCode } from '../utils/affiliate-code';
 import { RequestWithdrawalInput } from '../validators/settlement.validator';
 
 export class PartnerService {
@@ -43,7 +45,7 @@ export class PartnerService {
       }
     });
 
-    if (!partner) throw new AppError('Partner not found', 404, 'NOT_FOUND');
+    if (!partner) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
 
     // Auto promote cooling-off commissions
     const fourteenDaysAgo = new Date(Date.now() - STUDENT_REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000);
@@ -174,10 +176,10 @@ export class PartnerService {
       where: { id: partnerId }
     });
 
-    if (!partner) throw new AppError('Partner not found', 404, 'NOT_FOUND');
+    if (!partner) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
 
     if (partner.status !== PartnerStatus.ACTIVE) {
-      throw new AppError('Only active approved partners can request payment withdrawals', 403, 'FORBIDDEN');
+      throw new AppError('Only active approved affiliates can request payment withdrawals', 403, 'FORBIDDEN');
     }
 
     // Check if partner already has a pending or approved settlement awaiting payout
@@ -393,7 +395,7 @@ export class PartnerService {
       }
     });
 
-    if (!partner) throw new AppError('Partner not found', 404, 'NOT_FOUND');
+    if (!partner) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
 
     const baseUrl = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
     const registrationUrl = `${baseUrl}/register/${partner.partnerCode}`;
@@ -567,7 +569,7 @@ export class PartnerService {
     const userEmail = username;
     const partnerEmail = username;
 
-    // 1. Check duplicate Phone Number in User or Partner records
+    // 1. Check duplicate Phone Number in User (including soft-deleted to avoid DB unique constraint 500) and Partner records (mobile + whatsapp)
     const [existingPhoneUser, existingPhonePartner] = await Promise.all([
       prisma.user.findFirst({
         where: {
@@ -576,8 +578,7 @@ export class PartnerService {
             { phone: normalizedMobile },
             { phone: { endsWith: cleanMobileDigits } },
             { email: cleanMobileDigits }
-          ],
-          deletedAt: null
+          ]
         }
       }),
       prisma.partner.findFirst({
@@ -585,7 +586,10 @@ export class PartnerService {
           OR: [
             { mobile: cleanMobileDigits },
             { mobile: normalizedMobile },
-            { mobile: { endsWith: cleanMobileDigits } }
+            { mobile: { endsWith: cleanMobileDigits } },
+            { whatsapp: cleanMobileDigits },
+            { whatsapp: normalizedWhatsapp },
+            { whatsapp: { endsWith: cleanMobileDigits } }
           ],
           deletedAt: null
         }
@@ -594,53 +598,54 @@ export class PartnerService {
 
     if (existingPhoneUser || existingPhonePartner) {
       throw new AppError(
-        `An affiliate account with Phone Number '${cleanMobileDigits}' already exists. Please login to your dashboard or contact support.`,
+        `An affiliate account with Mobile Number '${cleanMobileDigits}' already exists. Please login to your dashboard or contact support.`,
         409,
         'DUPLICATE_PHONE'
       );
     }
 
-    // 2. Check duplicate WhatsApp Number in Partner and User records
-    const [existingWhatsappPartner, existingWhatsappUser] = await Promise.all([
-      prisma.partner.findFirst({
-        where: {
-          OR: [
-            { whatsapp: cleanWhatsappDigits },
-            { whatsapp: normalizedWhatsapp },
-            { whatsapp: { endsWith: cleanWhatsappDigits } },
-            { mobile: cleanWhatsappDigits },
-            { mobile: normalizedWhatsapp },
-            { mobile: { endsWith: cleanWhatsappDigits } }
-          ],
-          deletedAt: null
-        }
-      }),
-      prisma.user.findFirst({
-        where: {
-          OR: [
-            { phone: cleanWhatsappDigits },
-            { phone: normalizedWhatsapp },
-            { phone: { endsWith: cleanWhatsappDigits } },
-            { email: cleanWhatsappDigits }
-          ],
-          deletedAt: null
-        }
-      })
-    ]);
+    // 2. Check duplicate WhatsApp Number (only needed when different from Mobile Number)
+    if (cleanWhatsappDigits !== cleanMobileDigits) {
+      const [existingWhatsappPartner, existingWhatsappUser] = await Promise.all([
+        prisma.partner.findFirst({
+          where: {
+            OR: [
+              { whatsapp: cleanWhatsappDigits },
+              { whatsapp: normalizedWhatsapp },
+              { whatsapp: { endsWith: cleanWhatsappDigits } },
+              { mobile: cleanWhatsappDigits },
+              { mobile: normalizedWhatsapp },
+              { mobile: { endsWith: cleanWhatsappDigits } }
+            ],
+            deletedAt: null
+          }
+        }),
+        prisma.user.findFirst({
+          where: {
+            OR: [
+              { phone: cleanWhatsappDigits },
+              { phone: normalizedWhatsapp },
+              { phone: { endsWith: cleanWhatsappDigits } },
+              { email: cleanWhatsappDigits }
+            ]
+          }
+        })
+      ]);
 
-    if (existingWhatsappPartner || existingWhatsappUser) {
-      throw new AppError(
-        `An affiliate account with WhatsApp Number '${cleanWhatsappDigits}' already exists. Please enter a different WhatsApp number.`,
-        409,
-        'DUPLICATE_WHATSAPP'
-      );
+      if (existingWhatsappPartner || existingWhatsappUser) {
+        throw new AppError(
+          `An affiliate account with WhatsApp Number '${cleanWhatsappDigits}' already exists. Please enter a different WhatsApp number.`,
+          409,
+          'DUPLICATE_WHATSAPP'
+        );
+      }
     }
 
-    // 3. Check duplicate Email in User and Partner records (if email was provided)
+    // 3. Check duplicate Email in User (including soft-deleted) and Partner records (if email was provided)
     if (hasProvidedEmail) {
       const [existingEmailUser, existingEmailPartner] = await Promise.all([
         prisma.user.findFirst({
-          where: { email: { equals: emailLower, mode: 'insensitive' }, deletedAt: null }
+          where: { email: { equals: emailLower, mode: 'insensitive' } }
         }),
         prisma.partner.findFirst({
           where: { email: { equals: emailLower, mode: 'insensitive' }, deletedAt: null }
@@ -656,22 +661,15 @@ export class PartnerService {
       }
     }
 
-    // 2. Generate a unique provisional Partner Code e.g. PTR-PENDING-KAR-0005
-    const stateClean = data.state.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || 'IND';
-    const count = await prisma.partner.count();
-    const codeNumber = (count + 1).toString().padStart(4, '0');
-    const partnerCode = `PTR-PENDING-${stateClean}-${codeNumber}`;
-
-    // 3. Hash default password for the partner's future portal access
+    // 4. Hash default password for the affiliate's future portal access
     const defaultPassword = 'Partner@123456';
     const passwordHash = await hashPassword(defaultPassword);
 
-    const chosenCategory = data.occupation?.trim() || data.category?.trim() || 'Individual';
-    const isIndividual = chosenCategory === 'Individual (No Business)' ||
-      chosenCategory.toLowerCase().includes('individual') ||
-      chosenCategory.toLowerCase().includes('student') ||
-      chosenCategory.toLowerCase().includes('influencer');
-    const businessName = isIndividual ? `${fullName} (${chosenCategory})` : (data.businessName?.trim() || fullName);
+    const chosenCategory = data.occupation?.trim() || data.category?.trim() || 'Individual / Student';
+    const isIndividual = isIndividualOccupation(chosenCategory);
+    const businessName = isIndividual
+      ? `${fullName} (${chosenCategory})`
+      : (data.businessName?.trim() || fullName);
     const categoryEnum = mapCategoryToEnum(chosenCategory);
 
     const displayCategory = data.otherBusiness?.trim()
@@ -682,7 +680,7 @@ export class PartnerService {
     const profileParts = [
       `Occupation: ${displayCategory}`,
       data.gender?.trim() ? `Gender: ${data.gender.trim()}` : null,
-      data.age ? `Age: ${data.age}` : null,
+      data.age ? `Age: ${data.age}` : null
     ].filter(Boolean);
     const contactPersonInfo = profileParts.join(' | ');
 
@@ -694,9 +692,12 @@ export class PartnerService {
 
     const addressLine1 = (data.address && data.address.trim())
       ? data.address.trim()
-      : (isIndividual ? `Individual / Personal (${data.state.trim()})` : data.state.trim());
+      : (isIndividual ? `Individual / Personal (${data.state.trim()})` : 'Not Provided');
 
     const result = await prisma.$transaction(async (tx) => {
+      // Generate a unique 6-character alphanumeric affiliate code (e.g. "7K9M2X")
+      const partnerCode = await generateUniqueAffiliateCode(tx);
+
       // Create user login account (inactive until admin reviews and approves)
       const user = await tx.user.create({
         data: {
@@ -709,10 +710,10 @@ export class PartnerService {
         }
       });
 
-      const frontendBase = env.FRONTEND_URL || 'https://affiliate.iotaacademy.in';
+      const frontendBase = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
       const registrationUrl = `${frontendBase}/register/${partnerCode}`;
 
-      // Create partner record with PENDING_APPROVAL status
+      // Create affiliate record with PENDING_APPROVAL status
       const partner = await tx.partner.create({
         data: {
           userId: user.id,
@@ -720,14 +721,14 @@ export class PartnerService {
           businessName,
           category: categoryEnum,
           ownerName: fullName,
-          contactPerson: contactPersonInfo, // Stores human-readable category, gender, age
+          contactPerson: contactPersonInfo, // Stores human-readable occupation, gender, age
           mobile: cleanMobileDigits,
           whatsapp: cleanWhatsappDigits,
           email: partnerEmail,
           addressLine1,
           addressLine2, // Stores social profile links and custom notes
           city: data.state.trim(),
-          area: data.state.trim(),
+          area: '',
           pincode: data.pincode.trim(),
           registrationUrl,
           status: PartnerStatus.PENDING_APPROVAL
@@ -737,9 +738,30 @@ export class PartnerService {
       return { partner, user };
     });
 
+    // Notify all active Admins about the new affiliate application (non-blocking)
+    try {
+      const admins = await prisma.user.findMany({
+        where: { role: Role.ADMIN, isActive: true },
+        select: { id: true }
+      });
+      if (admins.length > 0) {
+        await prisma.notification.createMany({
+          data: admins.map((a) => ({
+            userId: a.id,
+            title: `New Affiliate Application [${result.partner.partnerCode}]`,
+            message: `${fullName} (${displayCategory}, ${data.state.trim()}) applied to join the IOTA Affiliate Program.`,
+            actionUrl: '/admin/partners?status=PENDING_APPROVAL'
+          }))
+        });
+      }
+    } catch (notifyErr) {
+      console.warn('Could not create admin notification for new affiliate application:', notifyErr);
+    }
+
     return {
       partnerId: result.partner.id,
       partnerCode: result.partner.partnerCode,
+      affiliateCode: result.partner.partnerCode,
       businessName: result.partner.businessName,
       ownerName: result.partner.ownerName,
       status: result.partner.status,
