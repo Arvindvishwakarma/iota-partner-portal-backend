@@ -1,31 +1,55 @@
-import crypto from 'crypto';
 import { prisma } from '../config/prisma';
 
-// Unambiguous uppercase alphanumeric characters (excludes 0, O, 1, I)
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const CODE_LENGTH = 6;
-
 /**
- * Generates a cryptographically random 6-character uppercase alphanumeric affiliate code (e.g. "7K9M2X").
- */
-export function generateRandomAffiliateCode(length = CODE_LENGTH): string {
-  const bytes = crypto.randomBytes(length);
-  let code = '';
-  for (let i = 0; i < length; i++) {
-    code += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
-  }
-  return code;
-}
-
-/**
- * Generates a guaranteed-unique 6-character affiliate code checked against the database.
+ * Generates an incrementing sequential Affiliate ID starting from IAA00101
+ * (IAA00101, IAA00102, IAA00103, ...).
  */
 export async function generateUniqueAffiliateCode(
-  dbClient: { partner: { findUnique: typeof prisma.partner.findUnique } } = prisma,
-  maxAttempts = 20
+  dbClient: any = prisma
 ): Promise<string> {
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const candidate = generateRandomAffiliateCode();
+  // If previous test partner LN7SW7 exists, upgrade it to IAA00101
+  try {
+    const lnPartner = await dbClient.partner.findUnique({
+      where: { partnerCode: 'LN7SW7' }
+    });
+    if (lnPartner) {
+      const frontendBase = (process.env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
+      await dbClient.partner.update({
+        where: { id: lnPartner.id },
+        data: {
+          partnerCode: 'IAA00101',
+          registrationUrl: `${frontendBase}/register/IAA00101`
+        }
+      });
+    }
+  } catch {
+    // Ignore if not found
+  }
+
+  // Find all existing partners with IAA prefix
+  const existingPartners = await dbClient.partner.findMany({
+    where: {
+      partnerCode: {
+        startsWith: 'IAA'
+      }
+    },
+    select: { partnerCode: true }
+  });
+
+  let maxSeq = 100; // Base: starting before 101, so the first code generated is IAA00101
+  for (const p of existingPartners) {
+    const match = (p.partnerCode || '').match(/^IAA(\d+)$/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > maxSeq) {
+        maxSeq = num;
+      }
+    }
+  }
+
+  let nextSeq = maxSeq + 1;
+  while (true) {
+    const candidate = `IAA${nextSeq.toString().padStart(5, '0')}`;
     const existing = await dbClient.partner.findUnique({
       where: { partnerCode: candidate },
       select: { id: true }
@@ -33,16 +57,18 @@ export async function generateUniqueAffiliateCode(
     if (!existing) {
       return candidate;
     }
+    nextSeq++;
   }
-  // Fallback to 7 characters if extremely unlikely collision streak occurs
-  return generateRandomAffiliateCode(CODE_LENGTH + 1);
 }
 
 /**
- * Determines whether a legacy code should be upgraded to the new 6-character affiliate code format.
+ * Determines whether a legacy code should be upgraded to the new IAA affiliate ID format.
  */
 export function isLegacyProvisionalCode(code?: string | null): boolean {
   if (!code) return true;
   const upper = code.toUpperCase();
-  return upper.startsWith('TEMP') || upper.startsWith('PTR-PENDING') || upper.startsWith('PTR-');
+  if (upper.startsWith('TEMP') || upper.startsWith('PTR-PENDING') || upper.startsWith('PTR-')) {
+    return true;
+  }
+  return !upper.startsWith('IAA');
 }
