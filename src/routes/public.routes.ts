@@ -15,6 +15,8 @@ router.post('/partners/register', validateBody(publicPartnerRegisterSchema), pub
 router.post('/otp/send-whatsapp', publicController.sendWhatsAppOtp);
 router.post('/otp/verify-whatsapp', publicController.verifyWhatsAppOtp);
 router.get('/otp/whatsapp-status', publicController.getWhatsAppStatus);
+router.post('/otp/send-email', publicController.sendEmailOtp);
+router.post('/otp/verify-email', publicController.verifyEmailOtp);
 router.post('/contact', validateBody(contactMessageSchema), publicController.submitContactMessage);
 
 export default router;

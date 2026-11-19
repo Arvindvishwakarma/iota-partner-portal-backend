@@ -27,15 +27,15 @@ describe('QR Code Generation Engine', () => {
 
 describe('Indian Phone Normalization (E.164)', () => {
   it('normalizes 10-digit raw numbers to +91XXXXXXXXXX', () => {
-    expect(normalizeIndianPhone('9876543210')).toBe('+919876543210');
+    expect(normalizeIndianPhone('8962545150')).toBe('+918962545150');
   });
 
   it('normalizes numbers with leading 0 to +91XXXXXXXXXX', () => {
-    expect(normalizeIndianPhone('09876543210')).toBe('+919876543210');
+    expect(normalizeIndianPhone('08962545150')).toBe('+918962545150');
   });
 
   it('normalizes numbers with formatted spaces and dashes', () => {
-    expect(normalizeIndianPhone('+91 98765-43210')).toBe('+919876543210');
+    expect(normalizeIndianPhone('+91 98765-43210')).toBe('+918962545150');
   });
 });
 
@@ -62,7 +62,7 @@ describe('Public Student Lead Intake & Validation API', () => {
     const res = await request(app).post('/api/v1/public/leads').send({
       partnerCode: 'PTR-BLR-0001',
       studentName: 'Aarav Patel',
-      mobile: '9876543210',
+      mobile: '8962545150',
       currentEducation: 'B.Tech 3rd Year',
       city: 'Indore',
       communicationConsent: false // rejected

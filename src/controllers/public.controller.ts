@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { leadService } from '../services/lead.service';
 import { partnerService } from '../services/partner.service';
 import { whatsappOtpService } from '../services/whatsapp-otp.service';
+import { emailOtpService } from '../services/email-otp.service';
 import { prisma } from '../config/prisma';
 
 export class PublicController {
@@ -69,6 +70,36 @@ export class PublicController {
     try {
       const { phone, otp } = req.body;
       const result = await whatsappOtpService.verifyOtp(phone, otp);
+      res.status(200).json({
+        success: true,
+        verified: true,
+        verificationToken: result.verificationToken,
+        message: result.message
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async sendEmailOtp(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email } = req.body;
+      const result = await emailOtpService.sendOtp(email);
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        cooldown: result.cooldown,
+        debugOtp: result.debugOtp
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async verifyEmailOtp(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email, otp } = req.body;
+      const result = await emailOtpService.verifyOtp(email, otp);
       res.status(200).json({
         success: true,
         verified: true,

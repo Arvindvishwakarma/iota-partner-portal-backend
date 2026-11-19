@@ -173,7 +173,7 @@ async function main() {
         bankAccountName: 'Apex Education Center',
         bankName: 'HDFC Bank',
         bankIfsc: 'HDFC0001234',
-        bankAccountNumber: '98765432101234'
+        bankAccountNumber: '89625451501234'
       }
     });
     console.log('✅ Sample Authorized Partner created: PTR-BLR-0001');

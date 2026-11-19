@@ -22,6 +22,7 @@ import {
 import { generateUniqueAffiliateCode } from '../utils/affiliate-code';
 import { RequestWithdrawalInput } from '../validators/settlement.validator';
 import { whatsappOtpService } from './whatsapp-otp.service';
+import { emailOtpService } from './email-otp.service';
 
 export class PartnerService {
   /**
@@ -577,6 +578,21 @@ export class PartnerService {
 
     const hasProvidedEmail = Boolean(data.email && data.email.trim());
     const emailLower = hasProvidedEmail ? data.email!.trim().toLowerCase() : '';
+
+    // 0b. Verify Email Address via OTP (if email is provided)
+    if (hasProvidedEmail) {
+      const isEmailVerified = emailOtpService.isEmailVerified(
+        emailLower,
+        data.emailVerificationToken
+      );
+      if (!isEmailVerified) {
+        throw new AppError(
+          'Email address has not been verified. Please verify your email with the OTP before submitting.',
+          400,
+          'EMAIL_NOT_VERIFIED'
+        );
+      }
+    }
 
     // If no email entered, the username is the 10-digit phone number without +91
     const username = hasProvidedEmail ? emailLower : cleanMobileDigits;

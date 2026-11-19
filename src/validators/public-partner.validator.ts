@@ -132,6 +132,7 @@ export const publicPartnerRegisterSchema = z
       .trim()
       .regex(/^\d{6}$/, 'Please enter a valid 6-digit PIN code'),
     whatsappVerificationToken: z.string().trim().optional().nullable(),
+    emailVerificationToken: z.string().trim().optional().nullable(),
     notes: z.string().trim().max(500, 'Notes must be at most 500 characters').optional().nullable()
   })
   .superRefine((data, ctx) => {

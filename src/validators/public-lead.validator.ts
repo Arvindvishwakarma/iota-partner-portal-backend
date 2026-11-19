@@ -31,7 +31,7 @@ export const publicStudentLeadSchema = z.object({
     .string({ required_error: 'Mobile number is required' })
     .transform(normalizeIndianPhone)
     .refine((val) => INDIAN_PHONE_REGEX.test(val), {
-      message: 'Please enter a valid 10-digit Indian mobile number (e.g., 9876543210 or +919876543210)'
+      message: 'Please enter a valid 10-digit Indian mobile number (e.g., 8962545150 or +918962545150)'
     }),
   whatsapp: z
     .string()
