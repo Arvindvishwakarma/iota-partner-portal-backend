@@ -21,6 +21,7 @@ import {
 } from '../validators/public-partner.validator';
 import { generateUniqueAffiliateCode } from '../utils/affiliate-code';
 import { RequestWithdrawalInput } from '../validators/settlement.validator';
+import { whatsappOtpService } from './whatsapp-otp.service';
 
 export class PartnerService {
   /**
@@ -561,6 +562,19 @@ export class PartnerService {
     const cleanWhatsappDigits = rawWhatsapp.replace(/\D/g, '').slice(-10);
     const normalizedWhatsapp = `+91${cleanWhatsappDigits}`;
 
+    // 0. Verify WhatsApp Number via OTP
+    const isWhatsappVerified = whatsappOtpService.isPhoneVerified(
+      cleanWhatsappDigits,
+      data.whatsappVerificationToken
+    );
+    if (!isWhatsappVerified) {
+      throw new AppError(
+        'WhatsApp number has not been verified. Please verify your WhatsApp number with the OTP before submitting.',
+        400,
+        'WHATSAPP_NOT_VERIFIED'
+      );
+    }
+
     const hasProvidedEmail = Boolean(data.email && data.email.trim());
     const emailLower = hasProvidedEmail ? data.email!.trim().toLowerCase() : '';
 
@@ -727,7 +741,7 @@ export class PartnerService {
           email: partnerEmail,
           addressLine1,
           addressLine2, // Stores social profile links and custom notes
-          city: data.state.trim(),
+          city: (data.city && data.city.trim()) ? data.city.trim() : data.state.trim(),
           area: '',
           pincode: data.pincode.trim(),
           registrationUrl,

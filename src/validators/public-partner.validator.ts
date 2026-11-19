@@ -116,6 +116,13 @@ export const publicPartnerRegisterSchema = z
       .trim()
       .min(3, 'Please enter your communication address')
       .max(300, 'Communication address must be at most 300 characters'),
+    city: z
+      .string({ required_error: 'City is required' })
+      .trim()
+      .min(2, 'Please enter your city')
+      .max(100, 'City must be at most 100 characters')
+      .optional()
+      .nullable(),
     state: z
       .string({ required_error: 'State is required' })
       .trim()
@@ -124,6 +131,7 @@ export const publicPartnerRegisterSchema = z
       .string({ required_error: 'Pincode is required' })
       .trim()
       .regex(/^\d{6}$/, 'Please enter a valid 6-digit PIN code'),
+    whatsappVerificationToken: z.string().trim().optional().nullable(),
     notes: z.string().trim().max(500, 'Notes must be at most 500 characters').optional().nullable()
   })
   .superRefine((data, ctx) => {

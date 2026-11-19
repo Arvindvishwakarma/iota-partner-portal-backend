@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { leadService } from '../services/lead.service';
 import { partnerService } from '../services/partner.service';
+import { whatsappOtpService } from '../services/whatsapp-otp.service';
 import { prisma } from '../config/prisma';
 
 export class PublicController {
@@ -43,6 +44,48 @@ export class PublicController {
         success: true,
         data: result,
         message: 'Your affiliate application has been submitted successfully! Our team will contact you shortly to activate your dashboard.'
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async sendWhatsAppOtp(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { phone } = req.body;
+      const result = await whatsappOtpService.sendOtp(phone);
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        cooldown: result.cooldown,
+        debugOtp: result.debugOtp
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async verifyWhatsAppOtp(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { phone, otp } = req.body;
+      const result = await whatsappOtpService.verifyOtp(phone, otp);
+      res.status(200).json({
+        success: true,
+        verified: true,
+        verificationToken: result.verificationToken,
+        message: result.message
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getWhatsAppStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+      const status = await whatsappOtpService.getWhatsAppStatus();
+      res.status(200).json({
+        success: true,
+        data: status
       });
     } catch (err) {
       next(err);

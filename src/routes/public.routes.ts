@@ -12,6 +12,9 @@ router.get('/partners/:partnerCode', publicController.verifyPartner);
 router.get('/courses', publicController.getCourses);
 router.post('/leads', validateBody(publicStudentLeadSchema), publicController.submitLead);
 router.post('/partners/register', validateBody(publicPartnerRegisterSchema), publicController.registerPartner);
+router.post('/otp/send-whatsapp', publicController.sendWhatsAppOtp);
+router.post('/otp/verify-whatsapp', publicController.verifyWhatsAppOtp);
+router.get('/otp/whatsapp-status', publicController.getWhatsAppStatus);
 router.post('/contact', validateBody(contactMessageSchema), publicController.submitContactMessage);
 
 export default router;

@@ -23,6 +23,7 @@ const envSchema = z.object({
   WHATSAPP_PHONE_NUMBER_ID: z.string().optional().default(''),
   WHATSAPP_BUSINESS_ACCOUNT_ID: z.string().optional().default(''),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().optional().default(''),
+  WHATSAPP_OTP_TEMPLATE_NAME: z.string().optional().default(''),
 
   EMAIL_HOST: z.string().optional().default(''),
   EMAIL_PORT: z.string().optional().default('587').transform((v) => parseInt(v, 10)),

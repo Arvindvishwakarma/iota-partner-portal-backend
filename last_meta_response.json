@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-11-19T04:53:03.416Z",
+  "success": true,
+  "successfulCandidate": "en with url button",
+  "recipient": "918518871350",
+  "templateName": "iota_affiliate_registration_otp",
+  "messageId": "wamid.HBgMOTE4NTE4ODcxMzUwFQIAERgSQjA5M0NBRjRDOUQyNUE3QzYxAA==",
+  "response": {
+    "messaging_product": "whatsapp",
+    "contacts": [
+      {
+        "input": "918518871350",
+        "wa_id": "918518871350"
+      }
+    ],
+    "messages": [
+      {
+        "id": "wamid.HBgMOTE4NTE4ODcxMzUwFQIAERgSQjA5M0NBRjRDOUQyNUE3QzYxAA==",
+        "message_status": "accepted"
+      }
+    ]
+  }
+}
