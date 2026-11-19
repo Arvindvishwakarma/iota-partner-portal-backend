@@ -665,7 +665,7 @@ export class PartnerService {
     const defaultPassword = 'Partner@123456';
     const passwordHash = await hashPassword(defaultPassword);
 
-    const chosenCategory = data.occupation?.trim() || data.category?.trim() || 'Individual / Student';
+    const chosenCategory = data.occupation?.trim() || data.category?.trim() || 'Student';
     const isIndividual = isIndividualOccupation(chosenCategory);
     const businessName = isIndividual
       ? `${fullName} (${chosenCategory})`

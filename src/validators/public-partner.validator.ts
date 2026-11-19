@@ -3,19 +3,34 @@ import { normalizeIndianPhone } from './public-lead.validator';
 import { INDIAN_PHONE_REGEX, PartnerCategory } from '../shared';
 
 /**
- * Single source of truth for whether an occupation/category is an individual (no business name required).
+ * Single source of truth for whether an occupation/category is an individual (no firm name required).
  */
 export function isIndividualOccupation(cat?: string | null): boolean {
   if (!cat) return true;
   const lower = cat.toLowerCase();
+  if (
+    lower.includes('business') ||
+    lower.includes('firm') ||
+    lower.includes('other') ||
+    lower.includes('shop') ||
+    lower.includes('library') ||
+    lower.includes('hostel') ||
+    lower.includes('center') ||
+    lower.includes('institute') ||
+    lower.includes('coaching')
+  ) {
+    return false;
+  }
   return (
-    lower.includes('individual') ||
     lower.includes('student') ||
     lower.includes('influencer') ||
     lower.includes('creator') ||
     lower.includes('working') ||
     lower.includes('professional') ||
-    lower.includes('freelancer')
+    lower.includes('freelancer') ||
+    lower.includes('educator') ||
+    lower.includes('tutor') ||
+    lower.includes('individual')
   );
 }
 
@@ -43,7 +58,7 @@ export function mapCategoryToEnum(cat?: string | null): PartnerCategory {
   if (lower.includes('coaching') || lower.includes('tuition')) {
     return PartnerCategory.COACHING_INSTITUTE;
   }
-  if (lower.includes('tutor') || lower.includes('education') || lower.includes('school') || lower.includes('college')) {
+  if (lower.includes('educator') || lower.includes('tutor') || lower.includes('education') || lower.includes('school') || lower.includes('college')) {
     return PartnerCategory.EDUCATIONAL_INSTITUTE;
   }
   return PartnerCategory.OTHER;
@@ -94,9 +109,13 @@ export const publicPartnerRegisterSchema = z
         .max(100, 'Please enter a valid age between 18 and 100')
     ),
     socialLink: z.string().trim().max(300, 'Social media link must be at most 300 characters').optional().nullable(),
-    otherBusiness: z.string().trim().max(150, 'Profession / business specification must be at most 150 characters').optional().nullable(),
-    businessName: z.string().trim().max(150, 'Business / Institute name must be at most 150 characters').optional().nullable(),
-    address: z.string().trim().max(300, 'Address must be at most 300 characters').optional().nullable(),
+    otherBusiness: z.string().trim().max(150, 'Occupation specification must be at most 150 characters').optional().nullable(),
+    businessName: z.string().trim().max(150, 'Firm Name must be at most 150 characters').optional().nullable(),
+    address: z
+      .string({ required_error: 'Communication address is required' })
+      .trim()
+      .min(3, 'Please enter your communication address')
+      .max(300, 'Communication address must be at most 300 characters'),
     state: z
       .string({ required_error: 'State is required' })
       .trim()
@@ -132,7 +151,7 @@ export const publicPartnerRegisterSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['otherBusiness'],
-        message: 'Please specify your profession or business'
+        message: 'Please specify your occupation'
       });
     }
 
@@ -140,7 +159,7 @@ export const publicPartnerRegisterSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['businessName'],
-        message: 'Please enter your Business / Institute Name'
+        message: 'Please enter your Firm Name'
       });
     }
   });
