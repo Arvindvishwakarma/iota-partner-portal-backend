@@ -154,7 +154,7 @@ export class EmailOtpService {
           <tr>
             <td style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); padding: 32px 30px; text-align: center;">
               <h1 style="color: #ffffff; font-size: 22px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">IOTA ACADEMY</h1>
-              <p style="color: #bfdbfe; font-size: 13px; margin: 6px 0 0; font-weight: 500;">Authorized Partner Registration</p>
+              <p style="color: #bfdbfe; font-size: 13px; margin: 6px 0 0; font-weight: 500;">Affiliate Program Registration</p>
             </td>
           </tr>
           <!-- Body -->
@@ -162,7 +162,7 @@ export class EmailOtpService {
             <td style="padding: 36px 32px;">
               <h2 style="color: #0f172a; font-size: 18px; margin: 0 0 12px; font-weight: 700;">Verify Your Email Address</h2>
               <p style="color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 24px;">
-                Thank you for applying to the IOTA Academy Partner Program. Please use the verification code below to verify your email address:
+                Thank you for applying to the IOTA Affiliate Program. Please use the verification code below to verify your email address:
               </p>
               
               <!-- OTP Box -->
@@ -182,7 +182,7 @@ export class EmailOtpService {
           <tr>
             <td style="background-color: #f1f5f9; padding: 20px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
               <p style="color: #64748b; font-size: 11px; margin: 0;">
-                © 2026 IOTA Academy. All rights reserved. | Sent from <strong>${from}</strong>
+                © 2026 TECHIOTA LLP (IOTA Academy). All rights reserved. | Sent from <strong>${from}</strong>
               </p>
             </td>
           </tr>
