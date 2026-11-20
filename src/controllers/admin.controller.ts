@@ -249,6 +249,55 @@ export class AdminController {
       next(err);
     }
   }
+
+  // Contact Inquiries Handlers
+  async listContactMessages(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await adminService.listContactMessages(req.query);
+      res.status(200).json({
+        success: true,
+        data: result.contacts,
+        meta: result.meta,
+        counts: result.counts
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getContactMessage(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const contact = await adminService.getContactMessage(id);
+      res.status(200).json({ success: true, data: contact });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateContactMessageStatus(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const updated = await adminService.updateContactMessageStatus(id, req.body);
+      res.status(200).json({
+        success: true,
+        data: updated,
+        message: 'Contact inquiry updated successfully'
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async deleteContactMessage(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      await adminService.deleteContactMessage(id);
+      res.status(200).json({ success: true, message: 'Contact inquiry deleted successfully' });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const adminController = new AdminController();

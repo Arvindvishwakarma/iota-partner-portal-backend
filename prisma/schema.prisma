@@ -20,6 +20,13 @@ enum Role {
   PARTNER
 }
 
+enum ContactStatus {
+  NEW
+  IN_PROGRESS
+  RESOLVED
+  ARCHIVED
+}
+
 enum PartnerCategory {
   COMPUTER_CENTER
   COACHING_INSTITUTE
@@ -601,4 +608,25 @@ model AuditLog {
   @@index([userId, createdAt])
   @@map("audit_logs")
 }
+
+model ContactMessage {
+  id            String        @id @default(uuid())
+  referenceCode String        @unique @map("reference_code")
+  name          String
+  email         String
+  phone         String
+  category      String
+  subject       String
+  message       String        @db.Text
+  status        ContactStatus @default(NEW)
+  adminNotes    String?       @map("admin_notes") @db.Text
+  respondedAt   DateTime?     @map("responded_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@index([createdAt])
+  @@map("contact_messages")
+}
+
 

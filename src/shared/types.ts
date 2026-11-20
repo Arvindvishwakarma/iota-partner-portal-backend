@@ -157,6 +157,29 @@ export interface ApiResponse<T> {
   meta?: PaginationMeta;
 }
 
+export enum ContactStatus {
+  NEW = 'NEW',
+  IN_PROGRESS = 'IN_PROGRESS',
+  RESOLVED = 'RESOLVED',
+  ARCHIVED = 'ARCHIVED'
+}
+
+export interface ContactMessageItem {
+  id: string;
+  referenceCode: string;
+  name: string;
+  email: string;
+  phone: string;
+  category: string;
+  subject: string;
+  message: string;
+  status: ContactStatus;
+  adminNotes?: string | null;
+  respondedAt?: Date | string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
 export interface ApiFieldError {
   field: string;
   issue: string;

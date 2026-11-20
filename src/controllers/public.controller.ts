@@ -126,7 +126,23 @@ export class PublicController {
   async submitContactMessage(req: Request, res: Response, next: NextFunction) {
     try {
       const { name, email, phone, category, subject, message } = req.body;
-      const refCode = `INQ-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const year = new Date().getFullYear();
+      const count = await prisma.contactMessage.count();
+      const refCode = `INQ-${year}-${(count + 101).toString().padStart(5, '0')}`;
+
+      // Persist contact inquiry in database
+      const savedMessage = await prisma.contactMessage.create({
+        data: {
+          referenceCode: refCode,
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          phone: phone.trim(),
+          category,
+          subject: subject.trim(),
+          message: message.trim(),
+          status: 'NEW'
+        }
+      });
 
       console.log(`[Contact Inquiry ${refCode}] From: ${name} (${email}, ${phone}) | Category: ${category} | Subject: ${subject}`);
 
@@ -139,9 +155,9 @@ export class PublicController {
           await prisma.notification.createMany({
             data: admins.map((a) => ({
               userId: a.id,
-              title: `New Inquiry [${refCode}]: ${subject}`,
+              title: `New Contact Inquiry [${refCode}]: ${subject}`,
               message: `${name} (${phone}, ${email}) submitted an inquiry under "${category}": ${message.slice(0, 150)}...`,
-              actionUrl: '/admin/notifications'
+              actionUrl: '/admin/contacts'
             }))
           });
         }
@@ -151,7 +167,10 @@ export class PublicController {
 
       res.status(200).json({
         success: true,
-        data: { referenceCode: refCode },
+        data: {
+          referenceCode: refCode,
+          id: savedMessage.id
+        },
         message: 'Thank you! Your message has been received. Our team will get back to you shortly.'
       });
     } catch (err) {

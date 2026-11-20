@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { AppError } from '../middlewares/error.middleware';
 import { hashPassword } from '../utils/password';
@@ -33,7 +34,10 @@ export class AdminService {
       totalSalespersons,
       commissionsAgg,
       recentPendingPartners,
-      recentLeads
+      recentLeads,
+      totalContacts,
+      newContacts,
+      recentContacts
     ] = await Promise.all([
       prisma.lead.count(),
       prisma.lead.count({
@@ -83,6 +87,23 @@ export class AdminService {
         },
         orderBy: { createdAt: 'desc' },
         take: 5
+      }),
+      prisma.contactMessage.count(),
+      prisma.contactMessage.count({ where: { status: 'NEW' } }),
+      prisma.contactMessage.findMany({
+        select: {
+          id: true,
+          referenceCode: true,
+          name: true,
+          email: true,
+          phone: true,
+          category: true,
+          subject: true,
+          status: true,
+          createdAt: true
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 5
       })
     ]);
 
@@ -111,8 +132,13 @@ export class AdminService {
         pendingCommission: pendingCommissionAmount,
         paidCommission: paidCommissionAmount
       },
+      contacts: {
+        total: totalContacts,
+        new: newContacts
+      },
       recentPendingPartners,
-      recentLeads
+      recentLeads,
+      recentContacts
     };
   }
 
@@ -864,6 +890,116 @@ export class AdminService {
 
       return updatedLead;
     });
+  }
+
+  // ============================================================================
+  // CONTACT INQUIRIES MANAGEMENT
+  // ============================================================================
+
+  async listContactMessages(query: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    category?: string;
+    status?: string;
+  }) {
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ContactMessageWhereInput = {};
+
+    if (query.status && query.status !== 'ALL') {
+      where.status = query.status as any;
+    }
+
+    if (query.category && query.category !== 'ALL') {
+      where.category = query.category;
+    }
+
+    if (query.search?.trim()) {
+      const q = query.search.trim();
+      where.OR = [
+        { referenceCode: { contains: q, mode: 'insensitive' } },
+        { name: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+        { phone: { contains: q } },
+        { subject: { contains: q, mode: 'insensitive' } },
+        { message: { contains: q, mode: 'insensitive' } }
+      ];
+    }
+
+    const [total, items, newCount, inProgressCount, resolvedCount, totalAll] = await Promise.all([
+      prisma.contactMessage.count({ where }),
+      prisma.contactMessage.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit
+      }),
+      prisma.contactMessage.count({ where: { status: 'NEW' } }),
+      prisma.contactMessage.count({ where: { status: 'IN_PROGRESS' } }),
+      prisma.contactMessage.count({ where: { status: 'RESOLVED' } }),
+      prisma.contactMessage.count()
+    ]);
+
+    return {
+      contacts: items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      },
+      counts: {
+        total: totalAll,
+        new: newCount,
+        inProgress: inProgressCount,
+        resolved: resolvedCount
+      }
+    };
+  }
+
+  async getContactMessage(id: string) {
+    const item = await prisma.contactMessage.findUnique({
+      where: { id }
+    });
+    if (!item) {
+      throw new AppError('Contact message not found', 404, 'NOT_FOUND');
+    }
+    return item;
+  }
+
+  async updateContactMessageStatus(id: string, data: { status?: string; adminNotes?: string | null }) {
+    const existing = await prisma.contactMessage.findUnique({ where: { id } });
+    if (!existing) {
+      throw new AppError('Contact message not found', 404, 'NOT_FOUND');
+    }
+
+    const updateData: Prisma.ContactMessageUpdateInput = {};
+    if (data.status) {
+      updateData.status = data.status as any;
+      if (data.status === 'RESOLVED' && !existing.respondedAt) {
+        updateData.respondedAt = new Date();
+      }
+    }
+    if (data.adminNotes !== undefined) {
+      updateData.adminNotes = data.adminNotes;
+    }
+
+    return prisma.contactMessage.update({
+      where: { id },
+      data: updateData
+    });
+  }
+
+  async deleteContactMessage(id: string) {
+    const existing = await prisma.contactMessage.findUnique({ where: { id } });
+    if (!existing) {
+      throw new AppError('Contact message not found', 404, 'NOT_FOUND');
+    }
+    await prisma.contactMessage.delete({ where: { id } });
+    return { success: true };
   }
 }
 

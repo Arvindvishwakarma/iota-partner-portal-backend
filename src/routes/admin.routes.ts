@@ -14,7 +14,8 @@ import {
   assignVisitSchema,
   unassignVisitSchema,
   bulkAssignVisitsSchema,
-  reassignLeadSchema
+  reassignLeadSchema,
+  updateContactStatusSchema
 } from '../validators/admin.validator';
 import { onboardPartnerSchema } from '../validators/sales.validator';
 
@@ -58,6 +59,12 @@ router.post('/visits/bulk-assign', validateBody(bulkAssignVisitsSchema), adminCo
 // Lead Monitoring & Reassignment
 router.get('/leads', adminController.listLeads);
 router.patch('/leads/:id/reassign', validateBody(reassignLeadSchema), adminController.reassignLead);
+
+// Contact Messages / Inquiries Management
+router.get('/contacts', adminController.listContactMessages);
+router.get('/contacts/:id', adminController.getContactMessage);
+router.patch('/contacts/:id', validateBody(updateContactStatusSchema), adminController.updateContactMessageStatus);
+router.delete('/contacts/:id', adminController.deleteContactMessage);
 
 export default router;
 
