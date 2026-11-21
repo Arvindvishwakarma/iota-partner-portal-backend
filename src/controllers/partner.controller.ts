@@ -23,16 +23,6 @@ export class PartnerController {
     }
   }
 
-  async getQrAssets(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const partnerId = this.getPartnerId(req);
-      const assets = await partnerService.getQrAssets(partnerId);
-      res.status(200).json({ success: true, data: assets });
-    } catch (err) {
-      next(err);
-    }
-  }
-
   async getLeads(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const partnerId = this.getPartnerId(req);

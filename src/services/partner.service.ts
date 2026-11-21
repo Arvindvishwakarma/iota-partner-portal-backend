@@ -66,15 +66,45 @@ export class PartnerService {
       }
     });
 
+    const baseUrl = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
+    const liveRegistrationUrl = `${baseUrl}/register/${partner.partnerCode}`;
+
     const [
-      totalLeads,
+      totalStudentsReferred,
+      activeLeads,
       todayLeads,
       admissionsCount,
-      commissionsAgg,
+      allCommissions,
       recentLeads,
-      activeSettlement
+      activeSettlement,
+      qrPngDataUrl,
+      qrSvgString
     ] = await Promise.all([
-      prisma.lead.count({ where: { partnerId } }),
+      // Card 1: Total unique valid students referred
+      prisma.lead.count({
+        where: {
+          partnerId,
+          status: { notIn: [LeadStatus.DUPLICATE_IGNORED, LeadStatus.INVALID_CONTACT] }
+        }
+      }),
+      // Card 2: Active leads in counseling/admission process
+      prisma.lead.count({
+        where: {
+          partnerId,
+          status: {
+            in: [
+              LeadStatus.NEW,
+              LeadStatus.CONTACTED,
+              LeadStatus.CONNECTED,
+              LeadStatus.INTERESTED,
+              LeadStatus.FOLLOW_UP_REQUIRED,
+              LeadStatus.OFFICE_VISIT_SCHEDULED,
+              LeadStatus.OFFICE_VISIT_COMPLETED,
+              LeadStatus.DEMO_ATTENDED
+            ]
+          }
+        }
+      }),
       prisma.lead.count({
         where: {
           partnerId,
@@ -84,29 +114,62 @@ export class PartnerService {
       prisma.lead.count({
         where: { partnerId, status: LeadStatus.ADMISSION_CONFIRMED }
       }),
-      prisma.partnerCommission.groupBy({
-        by: ['status'],
-        where: { partnerId },
-        _sum: { commissionAmount: true }
+      // Commissions for eligible courses (course fee > 15,000, admission not rejected/cancelled/refunded)
+      prisma.partnerCommission.findMany({
+        where: {
+          partnerId,
+          status: {
+            in: [
+              CommissionStatus.PENDING,
+              CommissionStatus.ELIGIBLE,
+              CommissionStatus.PROCESSING,
+              CommissionStatus.PAID
+            ]
+          },
+          admission: {
+            status: {
+              notIn: [
+                AdmissionStatus.REJECTED,
+                AdmissionStatus.CANCELLED,
+                AdmissionStatus.REFUNDED
+              ]
+            },
+            OR: [
+              { totalFee: { gt: 15000 } },
+              { course: { feeAmount: { gt: 15000 } } }
+            ]
+          }
+        },
+        select: {
+          id: true,
+          commissionAmount: true,
+          status: true,
+          settlementId: true
+        }
       }),
+      // Recent student referrals (permitted student info only, no email/phone)
       prisma.lead.findMany({
-        where: { partnerId },
+        where: {
+          partnerId,
+          status: { notIn: [LeadStatus.DUPLICATE_IGNORED, LeadStatus.INVALID_CONTACT] }
+        },
         select: {
           id: true,
           leadCode: true,
           studentName: true,
           createdAt: true,
           status: true,
-          interestedCourse: { select: { name: true } },
+          interestedCourse: { select: { name: true, feeAmount: true } },
           admission: {
             select: {
               status: true,
+              totalFee: true,
               commission: { select: { commissionAmount: true, status: true } }
             }
           }
         },
         orderBy: { createdAt: 'desc' },
-        take: 5
+        take: 6
       }),
       prisma.settlement.findFirst({
         where: {
@@ -123,46 +186,48 @@ export class PartnerService {
           createdAt: true,
           notes: true
         }
-      })
+      }),
+      generateQrPngDataUrl(liveRegistrationUrl),
+      generateQrSvgString(liveRegistrationUrl)
     ]);
 
-    const totalCommission = commissionsAgg.reduce(
-      (acc, item) => acc + (Number(item._sum.commissionAmount) || 0),
+    // Card 3: Total Earnings Expected (all eligible course commissions)
+    const totalEarningsExpected = allCommissions.reduce(
+      (acc, item) => acc + (Number(item.commissionAmount) || 0),
       0
     );
 
-    const pendingCommission = commissionsAgg
-      .filter((i) => i.status === CommissionStatus.PENDING || i.status === CommissionStatus.ELIGIBLE)
-      .reduce((acc, item) => acc + (Number(item._sum.commissionAmount) || 0), 0);
+    // Card 4: Total Earnings Withdrawable (status ELIGIBLE, not yet in a settlement)
+    const totalEarningsWithdrawable = allCommissions
+      .filter((i) => i.status === CommissionStatus.ELIGIBLE && !i.settlementId)
+      .reduce((acc, item) => acc + (Number(item.commissionAmount) || 0), 0);
 
-    const withdrawableCommission = commissionsAgg
-      .filter((i) => i.status === CommissionStatus.ELIGIBLE)
-      .reduce((acc, item) => acc + (Number(item._sum.commissionAmount) || 0), 0);
-
-    const processingCommission = commissionsAgg
-      .filter((i) => i.status === CommissionStatus.PROCESSING)
-      .reduce((acc, item) => acc + (Number(item._sum.commissionAmount) || 0), 0);
-
-    const paidCommission = commissionsAgg
+    const paidCommission = allCommissions
       .filter((i) => i.status === CommissionStatus.PAID)
-      .reduce((acc, item) => acc + (Number(item._sum.commissionAmount) || 0), 0);
+      .reduce((acc, item) => acc + (Number(item.commissionAmount) || 0), 0);
 
-    const baseUrl = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
-    const liveRegistrationUrl = `${baseUrl}/register/${partner.partnerCode}`;
+    const pendingCommission = allCommissions
+      .filter((i) => i.status === CommissionStatus.PENDING)
+      .reduce((acc, item) => acc + (Number(item.commissionAmount) || 0), 0);
 
     return {
       partner: {
         ...partner,
-        registrationUrl: liveRegistrationUrl
+        registrationUrl: liveRegistrationUrl,
+        qrPngDataUrl,
+        qrSvgString
       },
       metrics: {
-        totalLeads,
+        totalStudentsReferred,
+        activeLeads,
+        totalEarningsExpected,
+        totalEarningsWithdrawable,
+        totalLeads: totalStudentsReferred,
         todayLeads,
         admissionsCount,
-        totalCommission,
+        totalCommission: totalEarningsExpected,
         pendingCommission,
-        withdrawableCommission,
-        processingCommission,
+        withdrawableCommission: totalEarningsWithdrawable,
         paidCommission
       },
       activeSettlement,
@@ -383,42 +448,6 @@ export class PartnerService {
   }
 
   /**
-   * Generate Live High-Resolution QR Assets & Poster URLs
-   */
-  async getQrAssets(partnerId: string) {
-    const partner = await prisma.partner.findUnique({
-      where: { id: partnerId },
-      select: {
-        id: true,
-        partnerCode: true,
-        businessName: true,
-        city: true,
-        registrationUrl: true
-      }
-    });
-
-    if (!partner) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
-
-    const baseUrl = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
-    const registrationUrl = `${baseUrl}/register/${partner.partnerCode}`;
-
-    // Generate live PNG data URL & SVG string
-    const [pngDataUrl, svgString] = await Promise.all([
-      generateQrPngDataUrl(registrationUrl),
-      generateQrSvgString(registrationUrl)
-    ]);
-
-    return {
-      partnerCode: partner.partnerCode,
-      businessName: partner.businessName,
-      city: partner.city,
-      registrationUrl,
-      pngDataUrl,
-      svgString
-    };
-  }
-
-  /**
    * List Attributed Leads for Partner (Read-Only Statuses)
    */
   async getLeads(partnerId: string, status?: LeadStatus, search?: string, page = 1, limit = 20) {
@@ -442,11 +471,12 @@ export class PartnerService {
           studentName: true,
           createdAt: true,
           status: true,
-          interestedCourse: { select: { id: true, name: true, durationWeeks: true } },
+          interestedCourse: { select: { id: true, name: true, feeAmount: true, durationWeeks: true } },
           admission: {
             select: {
               admissionCode: true,
               status: true,
+              totalFee: true,
               commission: { select: { commissionAmount: true, status: true } }
             }
           }

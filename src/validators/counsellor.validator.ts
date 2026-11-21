@@ -10,30 +10,11 @@ export const logActivitySchema = z.object({
 });
 
 export const updateLeadStatusSchema = z.object({
-  status: z.nativeEnum(LeadStatus, {
-    errorMap: () => ({ message: 'Invalid lead status' })
-  }),
+  status: z.string().min(1, 'Status is required'),
   remarks: z.string().max(500).optional(),
   reason: z.string().max(500).optional(),
   scheduledFor: z.string().datetime().optional().nullable()
-}).refine(
-  (data) => {
-    if (
-      (data.status === LeadStatus.LOST ||
-        data.status === LeadStatus.NOT_INTERESTED ||
-        data.status === LeadStatus.INVALID_CONTACT) &&
-      !data.reason &&
-      !data.remarks
-    ) {
-      return false;
-    }
-    return true;
-  },
-  {
-    message: 'A specific reason or remark is mandatory when dropping or marking a lead as not interested',
-    path: ['reason']
-  }
-);
+});
 
 export const convertAdmissionSchema = z.object({
   courseId: z.string().uuid('Valid course ID is required'),

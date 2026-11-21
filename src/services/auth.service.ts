@@ -82,7 +82,8 @@ export class AuthService {
       role: user.role as Role,
       isActive: user.isActive,
       avatarUrl: user.avatarUrl,
-      partnerId
+      partnerId,
+      partnerCode: user.partnerProfile?.partnerCode
     };
 
     return {
@@ -142,7 +143,8 @@ export class AuthService {
       role: user.role as Role,
       isActive: user.isActive,
       avatarUrl: user.avatarUrl,
-      partnerId: user.partnerProfile?.id
+      partnerId: user.partnerProfile?.id,
+      partnerCode: user.partnerProfile?.partnerCode
     };
   }
 

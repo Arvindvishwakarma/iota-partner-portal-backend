@@ -211,5 +211,6 @@ export interface AuthenticatedUser {
   isActive: boolean;
   avatarUrl?: string | null;
   partnerId?: string | null;
+  partnerCode?: string | null;
 }
 

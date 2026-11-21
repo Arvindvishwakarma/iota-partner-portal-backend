@@ -318,46 +318,165 @@ export class CounsellorService {
   }
 
   /**
-   * Advance Lead Status (Strict State Machine Validation)
+   * Update Lead Status across the 8 lifecycle stages:
+   * 1) Pending (By Default)
+   * 2) Counselling
+   * 3) Demo in Progress
+   * 4) Demo Done
+   * 5) Registration Done
+   * 6) Joined
+   * 7) Cancelled
+   * 8) Dropout
    */
   async updateLeadStatus(counsellorId: string, leadId: string, role: string, data: UpdateLeadStatusInput) {
     const lead = await this.getLeadById(counsellorId, leadId, role);
     const currentStatus = lead.status;
-    const nextStatus = data.status;
+    const inputStatus = (data.status || '').trim();
 
-    // Check state machine transition
-    const validTransitions = VALID_LEAD_TRANSITIONS[currentStatus] || [];
-    if (!validTransitions.includes(nextStatus)) {
-      throw new AppError(
-        `Invalid pipeline transition from '${currentStatus}' to '${nextStatus}'. Permitted transitions: ${
-          validTransitions.length > 0 ? validTransitions.join(', ') : 'None (Terminal state)'
-        }`,
-        400,
-        'INVALID_LEAD_TRANSITION'
-      );
+    // Map input to LeadStatus and optional AdmissionStatus
+    let targetLeadStatus: LeadStatus = LeadStatus.NEW;
+    let targetAdmissionStatus: AdmissionStatus | null = null;
+    let displayStatusLabel = inputStatus;
+
+    const norm = inputStatus.toUpperCase().replace(/\s+/g, '_');
+
+    if (norm === 'JOINED') {
+      targetLeadStatus = LeadStatus.ADMISSION_CONFIRMED;
+      targetAdmissionStatus = AdmissionStatus.VERIFIED;
+      displayStatusLabel = 'Joined';
+    } else if (norm === 'CANCELLED' || norm === 'CANCELED' || norm === 'INVALID_CONTACT') {
+      targetLeadStatus = LeadStatus.INVALID_CONTACT;
+      targetAdmissionStatus = AdmissionStatus.CANCELLED;
+      displayStatusLabel = 'Cancelled';
+    } else if (norm === 'DROPOUT' || norm === 'DROPPED' || norm === 'LOST' || norm === 'NOT_INTERESTED') {
+      targetLeadStatus = LeadStatus.LOST;
+      targetAdmissionStatus = AdmissionStatus.REJECTED;
+      displayStatusLabel = 'Dropout';
+    } else if (norm === 'REGISTRATION_DONE' || norm === 'ADMISSION_CONFIRMED') {
+      targetLeadStatus = LeadStatus.ADMISSION_CONFIRMED;
+      targetAdmissionStatus = AdmissionStatus.PENDING_VERIFICATION;
+      displayStatusLabel = 'Registration Done';
+    } else if (norm === 'DEMO_DONE' || norm === 'DEMO_ATTENDED' || norm === 'OFFICE_VISIT_COMPLETED') {
+      targetLeadStatus = LeadStatus.DEMO_ATTENDED;
+      displayStatusLabel = 'Demo Done';
+    } else if (
+      norm === 'DEMO_IN_PROGRESS' ||
+      norm === 'OFFICE_VISIT_SCHEDULED' ||
+      norm === 'DEMO_SCHEDULED' ||
+      norm === 'VISIT_SCHEDULED'
+    ) {
+      targetLeadStatus = LeadStatus.OFFICE_VISIT_SCHEDULED;
+      displayStatusLabel = 'Demo in Progress';
+    } else if (
+      norm === 'COUNSELLING' ||
+      norm === 'COUNSELING' ||
+      norm === 'CONTACTED' ||
+      norm === 'CONNECTED' ||
+      norm === 'INTERESTED' ||
+      norm === 'FOLLOW_UP_REQUIRED'
+    ) {
+      targetLeadStatus = LeadStatus.CONNECTED;
+      displayStatusLabel = 'Counselling';
+    } else if (norm === 'PENDING' || norm === 'NEW') {
+      targetLeadStatus = LeadStatus.NEW;
+      displayStatusLabel = 'Pending';
+    } else if (Object.values(LeadStatus).includes(inputStatus as LeadStatus)) {
+      targetLeadStatus = inputStatus as LeadStatus;
     }
 
     const remarks = data.reason
       ? `[Reason: ${data.reason}] ${data.remarks || ''}`.trim()
-      : data.remarks || `Status transitioned to ${nextStatus}`;
+      : data.remarks || `Status updated to ${displayStatusLabel}`;
 
     const updated = await prisma.$transaction(async (tx) => {
+      // 1. Update Lead Status
       const updatedLead = await tx.lead.update({
         where: { id: leadId },
         data: {
-          status: nextStatus,
+          status: targetLeadStatus,
           lastActivityAt: new Date(),
           lastActivityById: counsellorId
+        },
+        include: {
+          admission: true,
+          interestedCourse: true,
+          partner: true
         }
       });
 
+      // 2. Sync admission status if relevant
+      if (
+        (norm === 'JOINED' || norm === 'REGISTRATION_DONE') &&
+        !lead.admission &&
+        lead.interestedCourseId
+      ) {
+        const course = await tx.course.findUnique({ where: { id: lead.interestedCourseId } });
+        if (course) {
+          const timestamp = Date.now().toString().slice(-4);
+          const randomSuffix = Math.floor(100 + Math.random() * 900);
+          const admissionCode = `ADM-2026-${timestamp}${randomSuffix}`;
+
+          const newAdm = await tx.admission.create({
+            data: {
+              admissionCode,
+              leadId,
+              courseId: course.id,
+              totalFee: course.feeAmount,
+              paidFee: course.feeAmount,
+              status: targetAdmissionStatus || AdmissionStatus.PENDING_VERIFICATION,
+              verifiedByUserId: norm === 'JOINED' ? counsellorId : null,
+              verifiedAt: norm === 'JOINED' ? new Date() : null
+            }
+          });
+
+          if (lead.partnerId) {
+            await tx.partnerCommission.create({
+              data: {
+                partnerId: lead.partnerId,
+                admissionId: newAdm.id,
+                commissionAmount: 1000.0,
+                status: norm === 'JOINED' ? CommissionStatus.ELIGIBLE : CommissionStatus.PENDING
+              }
+            });
+          }
+        }
+      } else if (lead.admission && targetAdmissionStatus) {
+        await tx.admission.update({
+          where: { id: lead.admission.id },
+          data: {
+            status: targetAdmissionStatus,
+            ...(targetAdmissionStatus === AdmissionStatus.VERIFIED
+              ? { verifiedByUserId: counsellorId, verifiedAt: new Date() }
+              : {})
+          }
+        });
+
+        if (lead.admission.commission) {
+          if (targetAdmissionStatus === AdmissionStatus.VERIFIED) {
+            await tx.partnerCommission.update({
+              where: { id: lead.admission.commission.id },
+              data: { status: CommissionStatus.ELIGIBLE }
+            });
+          } else if (
+            targetAdmissionStatus === AdmissionStatus.CANCELLED ||
+            targetAdmissionStatus === AdmissionStatus.REJECTED
+          ) {
+            await tx.partnerCommission.update({
+              where: { id: lead.admission.commission.id },
+              data: { status: CommissionStatus.ON_HOLD }
+            });
+          }
+        }
+      }
+
+      // 3. Activity record
       await tx.leadActivity.create({
         data: {
           leadId,
           userId: counsellorId,
           activityType: LeadActivityType.STATUS_CHANGE,
           previousStatus: currentStatus,
-          newStatus: nextStatus,
+          newStatus: targetLeadStatus,
           remarks,
           scheduledFor: data.scheduledFor ? new Date(data.scheduledFor) : null
         }
@@ -366,7 +485,7 @@ export class CounsellorService {
       return updatedLead;
     });
 
-    return updated;
+    return this.getLeadById(counsellorId, leadId, role);
   }
 
   /**
