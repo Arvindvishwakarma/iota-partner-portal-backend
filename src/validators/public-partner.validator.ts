@@ -105,10 +105,10 @@ export const publicPartnerRegisterSchema = z
           invalid_type_error: 'Please enter a valid age'
         })
         .int('Age must be a whole number')
-        .min(18, 'You must be at least 18 years old to join the IOTA Affiliate Program')
-        .max(100, 'Please enter a valid age between 18 and 100')
+        .min(18, 'You must be at least 18 years old to join the IOTA Academy Affiliate Program')
+        .max(99, 'Age must be less than 100 (Age >= 18 and < 100)')
     ),
-    socialLink: z.string().trim().max(300, 'Social media link must be at most 300 characters').optional().nullable(),
+    socialLink: z.string().trim().max(1000, 'Social media link must be at most 1000 characters').optional().nullable(),
     otherBusiness: z.string().trim().max(150, 'Occupation specification must be at most 150 characters').optional().nullable(),
     businessName: z.string().trim().max(150, 'Firm Name must be at most 150 characters').optional().nullable(),
     address: z

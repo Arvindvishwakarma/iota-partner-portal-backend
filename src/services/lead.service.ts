@@ -115,7 +115,7 @@ export class LeadService {
     // Handle Duplicate Submissions within 60-day Window (Rule BR-LED-02)
     if (existingLead) {
       logger.info(
-        `Duplicate inquiry detected for ${data.mobile}. Original Partner: ${existingLead.partner?.partnerCode || 'ORGANIC'}. Attempted Partner: ${partner.partnerCode}. Preserving original attribution.`
+        `Duplicate enquiry detected for ${data.mobile}. Original Partner: ${existingLead.partner?.partnerCode || 'ORGANIC'}. Attempted Partner: ${partner.partnerCode}. Preserving original attribution.`
       );
 
       // Audit duplicate attempt in duplicate_lead_submissions
@@ -136,7 +136,7 @@ export class LeadService {
           leadId: existingLead.id,
           userId: existingLead.currentCounsellorId || (await this.getFallbackAdminUserId()),
           activityType: LeadActivityType.NOTE_ADDED,
-          remarks: `Student re-submitted inquiry via partner ${partner.businessName} (${partner.partnerCode}). Original attribution preserved.`
+          remarks: `Student re-submitted enquiry via partner ${partner.businessName} (${partner.partnerCode}). Original attribution preserved.`
         }
       });
 
@@ -145,7 +145,7 @@ export class LeadService {
         studentName: data.studentName,
         isExistingLead: true,
         partnerBusinessName: existingLead.partner?.businessName || partner.businessName,
-        message: 'Your inquiry has been successfully received! An academic counselor will connect with you shortly.'
+        message: 'Your enquiry has been successfully received! An academic counselor will connect with you shortly.'
       };
     }
 
@@ -208,7 +208,7 @@ export class LeadService {
           data: {
             userId: assignedCounsellorId,
             title: 'New Student Lead Assigned',
-            message: `New student ${lead.studentName} referred by ${partner.businessName} for counseling.`,
+            message: `New student ${lead.studentName} referred by ${partner.businessName} for counselling.`,
             channel: NotificationChannel.IN_APP,
             status: NotificationStatus.PENDING,
             actionUrl: `/counsellor/leads/${lead.id}`

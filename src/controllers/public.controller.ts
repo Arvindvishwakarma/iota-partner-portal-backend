@@ -130,7 +130,7 @@ export class PublicController {
       const count = await prisma.contactMessage.count();
       const refCode = `INQ-${year}-${(count + 101).toString().padStart(5, '0')}`;
 
-      // Persist contact inquiry in database
+      // Persist contact enquiry in database
       const savedMessage = await prisma.contactMessage.create({
         data: {
           referenceCode: refCode,
@@ -144,7 +144,7 @@ export class PublicController {
         }
       });
 
-      console.log(`[Contact Inquiry ${refCode}] From: ${name} (${email}, ${phone}) | Category: ${category} | Subject: ${subject}`);
+      console.log(`[Contact Enquiry ${refCode}] From: ${name} (${email}, ${phone}) | Category: ${category} | Subject: ${subject}`);
 
       try {
         const admins = await prisma.user.findMany({
@@ -155,14 +155,14 @@ export class PublicController {
           await prisma.notification.createMany({
             data: admins.map((a) => ({
               userId: a.id,
-              title: `New Contact Inquiry [${refCode}]: ${subject}`,
-              message: `${name} (${phone}, ${email}) submitted an inquiry under "${category}": ${message.slice(0, 150)}...`,
+              title: `New Contact Enquiry [${refCode}]: ${subject}`,
+              message: `${name} (${phone}, ${email}) submitted an enquiry under "${category}": ${message.slice(0, 150)}...`,
               actionUrl: '/admin/contacts'
             }))
           });
         }
       } catch (logErr) {
-        console.warn('Could not persist admin notification for inquiry:', logErr);
+        console.warn('Could not persist admin notification for enquiry:', logErr);
       }
 
       res.status(200).json({

@@ -278,7 +278,7 @@ export class SettlementService {
   }
 
   /**
-   * Get Single Settlement Batch with Itemized Commissions Ledger
+   * Get Single Settlement Batch with Itemized Rewards Ledger
    */
   async getSettlementById(settlementId: string) {
     const settlement = await prisma.settlement.findUnique({

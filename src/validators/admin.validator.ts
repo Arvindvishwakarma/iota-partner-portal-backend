@@ -108,7 +108,7 @@ export const reassignLeadSchema = z.object({
   remarks: z.string().optional()
 });
 
-// Contact Inquiry Status Update Schema
+// Contact enquiry Status Update Schema
 export const updateContactStatusSchema = z.object({
   status: z.enum(['NEW', 'IN_PROGRESS', 'RESOLVED', 'ARCHIVED']).optional(),
   adminNotes: z.string().optional().nullable()

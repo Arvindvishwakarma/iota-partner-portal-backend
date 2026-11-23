@@ -41,7 +41,7 @@ export class NotificationService {
         const leadCode = params.leadCode || 'IOTA-INQ';
         return {
           templateName: 'iota_lead_welcome_v1',
-          textPreview: `Hello ${studentName}! 🎓 Welcome to IOTA Academy. We received your learning inquiry via our partner ${partnerName} (Ref: #${leadCode}). A senior academic counselor will connect with you shortly to guide your course roadmap and scholarship eligibility.`
+          textPreview: `Hello ${studentName}! 🎓 Welcome to IOTA Academy. We received your learning enquiry via our partner ${partnerName} (Ref: #${leadCode}). A senior academic counselor will connect with you shortly to guide your course roadmap and scholarship eligibility.`
         };
       }
 
@@ -61,7 +61,7 @@ export class NotificationService {
         const amount = params.commissionAmount || '1,000';
         return {
           templateName: 'iota_partner_commission_v1',
-          textPreview: `Congratulations ${partnerName}! ₹${amount} commission has been credited for ${studentName}'s enrollment. It will be released after the 14-day student verification cooling window.`
+          textPreview: `Congratulations ${partnerName}! ₹${amount} commission has been credited for ${studentName}'s admission. It will be released after the 14-day student verification cooling window.`
         };
       }
 

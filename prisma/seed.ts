@@ -104,7 +104,7 @@ async function main() {
     {
       code: 'GUIDANCE-01',
       name: 'Not sure yet - need guidance',
-      description: 'Comprehensive curriculum counseling & personalized academic roadmap discussion.',
+      description: 'Comprehensive curriculum counselling & personalized academic roadmap discussion.',
       feeAmount: 0.0,
       durationWeeks: 12
     }

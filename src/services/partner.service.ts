@@ -87,7 +87,7 @@ export class PartnerService {
           status: { notIn: [LeadStatus.DUPLICATE_IGNORED, LeadStatus.INVALID_CONTACT] }
         }
       }),
-      // Card 2: Active leads in counseling/admission process
+      // Card 2: Active leads in counselling/admission process
       prisma.lead.count({
         where: {
           partnerId,
@@ -809,7 +809,7 @@ export class PartnerService {
           data: admins.map((a) => ({
             userId: a.id,
             title: `New Affiliate Application [${result.partner.partnerCode}]`,
-            message: `${fullName} (${displayCategory}, ${data.state.trim()}) applied to join the IOTA Affiliate Program.`,
+            message: `${fullName} (${displayCategory}, ${data.state.trim()}) applied to join the IOTA Academy Affiliate Program.`,
             actionUrl: '/admin/partners?status=PENDING_APPROVAL'
           }))
         });

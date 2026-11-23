@@ -162,7 +162,7 @@ export class EmailOtpService {
             <td style="padding: 36px 32px;">
               <h2 style="color: #0f172a; font-size: 18px; margin: 0 0 12px; font-weight: 700;">Verify Your Email Address</h2>
               <p style="color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 24px;">
-                Thank you for applying to the IOTA Affiliate Program. Please use the verification code below to verify your email address:
+                Thank you for applying to the IOTA Academy Affiliate Program. Please use the verification code below to verify your email address:
               </p>
               
               <!-- OTP Box -->

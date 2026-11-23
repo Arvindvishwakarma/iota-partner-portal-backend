@@ -282,7 +282,7 @@ export class AdminController {
       res.status(200).json({
         success: true,
         data: updated,
-        message: 'Contact inquiry updated successfully'
+        message: 'Contact enquiry updated successfully'
       });
     } catch (err) {
       next(err);
@@ -293,7 +293,7 @@ export class AdminController {
     try {
       const { id } = req.params;
       await adminService.deleteContactMessage(id);
-      res.status(200).json({ success: true, message: 'Contact inquiry deleted successfully' });
+      res.status(200).json({ success: true, message: 'Contact enquiry deleted successfully' });
     } catch (err) {
       next(err);
     }
