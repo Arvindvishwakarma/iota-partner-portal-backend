@@ -714,7 +714,7 @@ export class PartnerService {
 
       if (existingEmailUser || existingEmailPartner) {
         throw new AppError(
-          `An affiliate account with Email '${emailLower}' already exists. Please sign in or use a different email address.`,
+          `An affiliate account with Email '${emailLower}' already exists. Please Login or use a different email address.`,
           409,
           'DUPLICATE_EMAIL'
         );
