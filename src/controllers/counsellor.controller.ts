@@ -102,6 +102,17 @@ export class CounsellorController {
       next(err);
     }
   }
+
+  async getActivities(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const counsellorId = req.user!.userId;
+      const role = req.user!.role;
+      const activities = await counsellorService.getActivities(counsellorId, role);
+      res.status(200).json({ success: true, data: activities });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const counsellorController = new CounsellorController();

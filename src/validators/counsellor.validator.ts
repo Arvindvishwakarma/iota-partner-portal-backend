@@ -13,6 +13,8 @@ export const updateLeadStatusSchema = z.object({
   status: z.string().min(1, 'Status is required'),
   remarks: z.string().max(500).optional(),
   reason: z.string().max(500).optional(),
+  registrationAmount: z.number().nonnegative().optional(),
+  paidFee: z.number().nonnegative().optional(),
   scheduledFor: z.string().datetime().optional().nullable()
 });
 

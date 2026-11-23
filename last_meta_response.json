@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-11-19T05:35:36.536Z",
+  "timestamp": "2026-11-21T05:08:27.814Z",
   "success": true,
   "successfulCandidate": "en with url button",
   "recipient": "918518871350",
   "templateName": "iota_affiliate_registration_otp",
-  "messageId": "wamid.HBgMOTE4NTE4ODcxMzUwFQIAERgSOEI5Mjk2MjY2ODFDQjNBMDhBAA==",
+  "messageId": "wamid.HBgMOTE4NTE4ODcxMzUwFQIAERgSNkExQUY2RkQwMkZFRTM4OEZFAA==",
   "response": {
     "messaging_product": "whatsapp",
     "contacts": [
@@ -15,7 +15,7 @@
     ],
     "messages": [
       {
-        "id": "wamid.HBgMOTE4NTE4ODcxMzUwFQIAERgSOEI5Mjk2MjY2ODFDQjNBMDhBAA==",
+        "id": "wamid.HBgMOTE4NTE4ODcxMzUwFQIAERgSNkExQUY2RkQwMkZFRTM4OEZFAA==",
         "message_status": "accepted"
       }
     ]

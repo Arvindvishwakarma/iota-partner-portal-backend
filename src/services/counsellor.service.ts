@@ -89,7 +89,7 @@ export class CounsellorService {
           city: true,
           createdAt: true,
           interestedCourse: { select: { id: true, name: true } },
-          partner: { select: { id: true, partnerCode: true, businessName: true } },
+          partner: { select: { id: true, partnerCode: true, businessName: true, ownerName: true } },
           activities: {
             where: { scheduledFor: { not: null } },
             orderBy: { scheduledFor: 'asc' },
@@ -167,7 +167,8 @@ export class CounsellorService {
             select: {
               id: true,
               partnerCode: true,
-              businessName: true
+              businessName: true,
+              ownerName: true
             }
           },
           interestedCourse: {
@@ -230,6 +231,7 @@ export class CounsellorService {
             id: true,
             partnerCode: true,
             businessName: true,
+            ownerName: true,
             city: true,
             mobile: true
           }
@@ -416,13 +418,15 @@ export class CounsellorService {
           const randomSuffix = Math.floor(100 + Math.random() * 900);
           const admissionCode = `ADM-2026-${timestamp}${randomSuffix}`;
 
+          const initialPaid = data.registrationAmount ?? data.paidFee ?? (norm === 'REGISTRATION_DONE' ? 1000 : course.feeAmount);
+
           const newAdm = await tx.admission.create({
             data: {
               admissionCode,
               leadId,
               courseId: course.id,
               totalFee: course.feeAmount,
-              paidFee: course.feeAmount,
+              paidFee: initialPaid,
               status: targetAdmissionStatus || AdmissionStatus.PENDING_VERIFICATION,
               verifiedByUserId: norm === 'JOINED' ? counsellorId : null,
               verifiedAt: norm === 'JOINED' ? new Date() : null
@@ -440,11 +444,14 @@ export class CounsellorService {
             });
           }
         }
-      } else if (lead.admission && targetAdmissionStatus) {
+      } else if (lead.admission) {
         await tx.admission.update({
           where: { id: lead.admission.id },
           data: {
-            status: targetAdmissionStatus,
+            ...(targetAdmissionStatus ? { status: targetAdmissionStatus } : {}),
+            ...(data.registrationAmount !== undefined || data.paidFee !== undefined
+              ? { paidFee: data.registrationAmount ?? data.paidFee }
+              : {}),
             ...(targetAdmissionStatus === AdmissionStatus.VERIFIED
               ? { verifiedByUserId: counsellorId, verifiedAt: new Date() }
               : {})
@@ -663,6 +670,40 @@ export class CounsellorService {
         upcoming: upcoming.length
       }
     };
+  }
+
+  /**
+   * Get Chronological Activity Stream for Counselor
+   */
+  async getActivities(counsellorId: string, role: string) {
+    const isCounselor = role === Role.COUNSELLOR;
+    const where: any = isCounselor ? { userId: counsellorId } : {};
+
+    const activities = await prisma.leadActivity.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: {
+        lead: {
+          select: {
+            id: true,
+            leadCode: true,
+            studentName: true,
+            mobile: true,
+            status: true,
+            interestedCourse: { select: { name: true } }
+          }
+        },
+        user: {
+          select: {
+            fullName: true,
+            role: true
+          }
+        }
+      }
+    });
+
+    return activities;
   }
 
   /**

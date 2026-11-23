@@ -20,6 +20,9 @@ router.get('/dashboard', (req, res, next) => counsellorController.getDashboard(r
 // Available courses for intake
 router.get('/courses', (req, res, next) => counsellorController.getCourses(req, res, next));
 
+// Activity log for counselor
+router.get('/activities', (req, res, next) => counsellorController.getActivities(req, res, next));
+
 // Scheduled follow-ups console
 router.get('/followups', (req, res, next) => counsellorController.getFollowups(req, res, next));
 
