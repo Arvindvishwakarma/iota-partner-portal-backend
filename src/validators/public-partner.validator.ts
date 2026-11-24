@@ -84,12 +84,10 @@ export const publicPartnerRegisterSchema = z
       .optional()
       .nullable(),
     email: z
-      .string()
+      .string({ required_error: 'Email address is required' })
       .trim()
-      .email('Please enter a valid email address')
-      .optional()
-      .or(z.literal(''))
-      .nullable(),
+      .min(1, 'Email address is required')
+      .email('Please enter a valid email address'),
     category: z.string().trim().max(100).optional().nullable(),
     occupation: z.string().trim().max(100).optional().nullable(),
     gender: z

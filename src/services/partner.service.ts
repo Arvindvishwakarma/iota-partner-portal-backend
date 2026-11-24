@@ -606,28 +606,27 @@ export class PartnerService {
       );
     }
 
-    const hasProvidedEmail = Boolean(data.email && data.email.trim());
-    const emailLower = hasProvidedEmail ? data.email!.trim().toLowerCase() : '';
+    if (!data.email || !data.email.trim()) {
+      throw new AppError('Email address is required', 400, 'INVALID_EMAIL');
+    }
+    const emailLower = data.email.trim().toLowerCase();
 
-    // 0b. Verify Email Address via OTP (if email is provided)
-    if (hasProvidedEmail) {
-      const isEmailVerified = emailOtpService.isEmailVerified(
-        emailLower,
-        data.emailVerificationToken
+    // 0b. Verify Email Address via OTP
+    const isEmailVerified = emailOtpService.isEmailVerified(
+      emailLower,
+      data.emailVerificationToken
+    );
+    if (!isEmailVerified) {
+      throw new AppError(
+        'Email address has not been verified. Please verify your email with the OTP before submitting.',
+        400,
+        'EMAIL_NOT_VERIFIED'
       );
-      if (!isEmailVerified) {
-        throw new AppError(
-          'Email address has not been verified. Please verify your email with the OTP before submitting.',
-          400,
-          'EMAIL_NOT_VERIFIED'
-        );
-      }
     }
 
-    // If no email entered, the username is the 10-digit phone number without +91
-    const username = hasProvidedEmail ? emailLower : cleanMobileDigits;
-    const userEmail = username;
-    const partnerEmail = username;
+    const username = emailLower;
+    const userEmail = emailLower;
+    const partnerEmail = emailLower;
 
     // 1. Check duplicate Phone Number in User (including soft-deleted to avoid DB unique constraint 500) and Partner records (mobile + whatsapp)
     const [existingPhoneUser, existingPhonePartner] = await Promise.all([
@@ -701,24 +700,22 @@ export class PartnerService {
       }
     }
 
-    // 3. Check duplicate Email in User (including soft-deleted) and Partner records (if email was provided)
-    if (hasProvidedEmail) {
-      const [existingEmailUser, existingEmailPartner] = await Promise.all([
-        prisma.user.findFirst({
-          where: { email: { equals: emailLower, mode: 'insensitive' } }
-        }),
-        prisma.partner.findFirst({
-          where: { email: { equals: emailLower, mode: 'insensitive' }, deletedAt: null }
-        })
-      ]);
+    // 3. Check duplicate Email in User (including soft-deleted) and Partner records
+    const [existingEmailUser, existingEmailPartner] = await Promise.all([
+      prisma.user.findFirst({
+        where: { email: { equals: emailLower, mode: 'insensitive' } }
+      }),
+      prisma.partner.findFirst({
+        where: { email: { equals: emailLower, mode: 'insensitive' }, deletedAt: null }
+      })
+    ]);
 
-      if (existingEmailUser || existingEmailPartner) {
-        throw new AppError(
-          `An affiliate account with Email '${emailLower}' already exists. Please Login or use a different email address.`,
-          409,
-          'DUPLICATE_EMAIL'
-        );
-      }
+    if (existingEmailUser || existingEmailPartner) {
+      throw new AppError(
+        `An affiliate account with Email '${emailLower}' already exists. Please Login or use a different email address.`,
+        409,
+        'DUPLICATE_EMAIL'
+      );
     }
 
     // 4. Hash default password for the affiliate's future portal access
