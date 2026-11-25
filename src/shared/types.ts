@@ -6,7 +6,26 @@ export enum Role {
   ADMIN = 'ADMIN',
   COUNSELLOR = 'COUNSELLOR',
   SALES = 'SALES',
+  AFFILIATE = 'AFFILIATE',
   PARTNER = 'PARTNER'
+}
+
+export enum Gender {
+  Male = 'Male',
+  Female = 'Female',
+  Other = 'Other'
+}
+
+export enum Occupation {
+  STUDENT = 'Student',
+  INFLUENCER = 'Influencer',
+  WORKING_PROFESSIONAL = 'Working Professional',
+  EDUCATOR = 'Educator',
+  FREELANCER = 'Freelancer',
+  CONSULTANT = 'Consultant',
+  SELF_EMPLOYED = 'Self-employed',
+  BUSINESS_OWNER = 'Business Owner',
+  OTHER = 'Other'
 }
 
 export enum PartnerCategory {
@@ -19,13 +38,18 @@ export enum PartnerCategory {
   OTHER = 'OTHER'
 }
 
-export enum PartnerStatus {
+export enum AffiliateStatus {
   PENDING_APPROVAL = 'PENDING_APPROVAL',
+  PROFILE_REJECTED = 'PROFILE_REJECTED',
+  KYC_PENDING = 'KYC_PENDING',
+  KYC_REJECTED = 'KYC_REJECTED',
+  KYC_REVISED = 'KYC_REVISED',
   ACTIVE = 'ACTIVE',
-  REJECTED = 'REJECTED',
   SUSPENDED = 'SUSPENDED',
   INACTIVE = 'INACTIVE'
 }
+
+export { AffiliateStatus as PartnerStatus };
 
 export enum PremisesStatus {
   UNASSIGNED = 'UNASSIGNED',
@@ -204,15 +228,26 @@ export interface JwtUserPayload {
 
 export interface AuthenticatedUser {
   id: string;
-  email: string;
+  firstName: string;
+  lastName: string;
   fullName: string;
+  email: string;
+  emailAddress: string;
   phone: string;
+  mobileNumber: string;
+  whatsappNumber: string;
+  gender: Gender;
+  age: number;
+  occupation: Occupation | string;
+  communicationAddress: string;
   role: Role;
   isActive: boolean;
   avatarUrl?: string | null;
   partnerId?: string | null;
   partnerCode?: string | null;
-  partnerStatus?: PartnerStatus | null;
+  affiliateCode?: string | null;
+  partnerStatus?: AffiliateStatus | null;
+  affiliateStatus?: AffiliateStatus | null;
   rejectionReason?: string | null;
 }
 

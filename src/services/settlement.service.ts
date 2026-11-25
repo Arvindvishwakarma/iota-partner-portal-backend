@@ -14,6 +14,7 @@ import {
   RefundAdmissionInput,
   VerifyAdmissionInput
 } from '../validators/settlement.validator';
+import { formatAffiliateBusinessName, formatFullName } from '../utils/user-display';
 
 export class SettlementService {
   /**
@@ -48,7 +49,7 @@ export class SettlementService {
               mobile: true,
               city: true,
               partner: {
-                select: { id: true, partnerCode: true, businessName: true }
+                select: { id: true, affiliateCode: true, firstName: true, lastName: true, firmName: true, occupation: true }
               }
             }
           },
@@ -65,7 +66,21 @@ export class SettlementService {
     ]);
 
     return {
-      admissions,
+      admissions: admissions.map((a) => ({
+        ...a,
+        lead: a.lead
+          ? {
+              ...a.lead,
+              partner: a.lead.partner
+                ? {
+                    id: a.lead.partner.id,
+                    partnerCode: a.lead.partner.affiliateCode,
+                    businessName: formatAffiliateBusinessName(a.lead.partner)
+                  }
+                : null
+            }
+          : null
+      })),
       meta: {
         total,
         page,
@@ -246,15 +261,16 @@ export class SettlementService {
           partner: {
             select: {
               id: true,
-              partnerCode: true,
-              businessName: true,
-              ownerName: true,
-              mobile: true,
-              bankAccountName: true,
+              affiliateCode: true,
+              firstName: true,
+              lastName: true,
+              firmName: true,
+              occupation: true,
+              mobileNumber: true,
+              bankAccountHolderName: true,
               bankAccountNumber: true,
-              bankIfsc: true,
-              bankName: true,
-              upiId: true
+              bankIfscNumber: true,
+              bankName: true
             }
           },
           transactions: { orderBy: { transactedAt: 'desc' } },
@@ -267,7 +283,22 @@ export class SettlementService {
     ]);
 
     return {
-      settlements,
+      settlements: settlements.map((s) => ({
+        ...s,
+        partner: s.partner
+          ? {
+              id: s.partner.id,
+              partnerCode: s.partner.affiliateCode,
+              businessName: formatAffiliateBusinessName(s.partner),
+              ownerName: formatFullName(s.partner.firstName, s.partner.lastName),
+              mobile: s.partner.mobileNumber,
+              bankAccountName: s.partner.bankAccountHolderName,
+              bankAccountNumber: s.partner.bankAccountNumber,
+              bankIfsc: s.partner.bankIfscNumber,
+              bankName: s.partner.bankName
+            }
+          : null
+      })),
       meta: {
         total,
         page,

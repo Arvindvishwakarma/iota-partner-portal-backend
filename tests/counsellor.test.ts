@@ -16,7 +16,7 @@ describe('Counselor CRM Module API & Security Guards', () => {
   const partnerToken = generateAccessToken({
     userId: 'partner-test-user-id',
     email: 'partner@iotaacademy.in',
-    role: Role.PARTNER,
+    role: Role.AFFILIATE,
     partnerId: 'partner-123'
   });
 

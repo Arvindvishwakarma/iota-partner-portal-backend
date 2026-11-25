@@ -32,7 +32,12 @@ const envSchema = z.object({
   EMAIL_FROM: z.string().optional().default('IOTA Academy <noreply@iotaacademy.in>'),
 
   FILE_STORAGE_PROVIDER: z.enum(['local', 's3', 'r2']).default('local'),
-  UPLOAD_DIR: z.string().default('./uploads')
+  UPLOAD_DIR: z.string().default('./uploads'),
+  ALLOW_TEST_OTP_BYPASS: z
+    .string()
+    .optional()
+    .default('false')
+    .transform((v) => v.trim().toLowerCase() === 'true')
 });
 
 const parseResult = envSchema.safeParse(process.env);

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { normalizeIndianPhone } from './public-lead.validator';
-import { INDIAN_PHONE_REGEX, PartnerCategory } from '../shared';
+import { Gender, INDIAN_PHONE_REGEX, Occupation } from '../shared';
 
 /**
  * Transforms any string into Capital Case (Title Case).
@@ -18,124 +18,23 @@ export function toCapitalCase(str?: string | null): string {
     .join(' ');
 }
 
-/**
- * Single source of truth for whether an occupation/category is an individual (no firm name required).
- */
-export function isIndividualOccupation(cat?: string | null): boolean {
-  if (!cat) return true;
-  const lower = cat.toLowerCase();
-  if (
-    lower.includes('business') ||
-    lower.includes('firm') ||
-    lower.includes('other') ||
-    lower.includes('shop') ||
-    lower.includes('library') ||
-    lower.includes('hostel') ||
-    lower.includes('center') ||
-    lower.includes('institute') ||
-    lower.includes('coaching')
-  ) {
-    return false;
-  }
-  return (
-    lower.includes('student') ||
-    lower.includes('influencer') ||
-    lower.includes('creator') ||
-    lower.includes('working') ||
-    lower.includes('professional') ||
-    lower.includes('freelancer') ||
-    lower.includes('educator') ||
-    lower.includes('tutor') ||
-    lower.includes('individual')
-  );
-}
-
-/**
- * Maps human-readable category strings (from landing page) or raw enum values to PartnerCategory enum
- */
-export function mapCategoryToEnum(cat?: string | null): PartnerCategory {
-  if (!cat) return PartnerCategory.OTHER;
-  const lower = cat.toLowerCase();
-  if (lower.includes('influencer') || lower.includes('creator')) {
-    return PartnerCategory.OTHER;
-  }
-  if (lower.includes('stationery') || lower.includes('book') || lower.includes('cafe')) {
-    return PartnerCategory.BOOKSTORE_OR_CAFE;
-  }
-  if (lower.includes('library')) {
-    return PartnerCategory.LIBRARY;
-  }
-  if (lower.includes('hostel') || lower.includes('pg')) {
-    return PartnerCategory.HOSTEL;
-  }
-  if (lower.includes('computer')) {
-    return PartnerCategory.COMPUTER_CENTER;
-  }
-  if (lower.includes('coaching') || lower.includes('tuition')) {
-    return PartnerCategory.COACHING_INSTITUTE;
-  }
-  if (lower.includes('educator') || lower.includes('tutor') || lower.includes('education') || lower.includes('school') || lower.includes('college')) {
-    return PartnerCategory.EDUCATIONAL_INSTITUTE;
-  }
-  return PartnerCategory.OTHER;
-}
-
 export const publicPartnerRegisterSchema = z
   .object({
     firstName: z
-      .string()
+      .string({ required_error: 'First name is required' })
       .trim()
+      .min(1, 'First name is required')
       .max(60, 'First name must be at most 60 characters')
-      .optional()
-      .nullable()
-      .transform((val) => (val ? toCapitalCase(val) : val)),
+      .transform((val) => toCapitalCase(val)),
     lastName: z
-      .string()
+      .string({ required_error: 'Last name is required' })
       .trim()
+      .min(1, 'Last name is required')
       .max(60, 'Last name must be at most 60 characters')
-      .optional()
-      .nullable()
-      .transform((val) => (val ? toCapitalCase(val) : val)),
-    fullName: z
-      .string()
-      .trim()
-      .max(125, 'Full name must be at most 125 characters')
-      .optional()
-      .nullable()
-      .transform((val) => (val ? toCapitalCase(val) : val)),
-    phone: z
-      .string({ required_error: 'Mobile number is required' })
-      .transform(normalizeIndianPhone)
-      .refine((val) => INDIAN_PHONE_REGEX.test(val), {
-        message: 'Please enter a valid 10-digit Indian mobile number starting with 6–9'
-      }),
-    whatsapp: z
-      .string()
-      .transform(normalizeIndianPhone)
-      .refine((val) => !val || INDIAN_PHONE_REGEX.test(val), {
-        message: 'Please enter a valid 10-digit Indian WhatsApp number starting with 6–9'
-      })
-      .optional()
-      .nullable(),
-    email: z
-      .string({ required_error: 'Email address is required' })
-      .trim()
-      .min(1, 'Email address is required')
-      .email('Please enter a valid email address'),
-    password: z
-      .string({ required_error: 'Password is required' })
-      .min(8, 'Password must be at least 8 characters long')
-      .regex(/[A-Za-z]/, 'Password must contain at least one alphabet letter')
-      .regex(/[0-9]/, 'Password must contain at least one digit (0–9)')
-      .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
-    confirmPassword: z.string({ required_error: 'Please confirm your password' }),
-    category: z.string().trim().max(100).optional().nullable(),
-    occupation: z.string().trim().max(100).optional().nullable(),
-    gender: z
-      .string({ required_error: 'Please select your gender' })
-      .trim()
-      .min(1, 'Please select your gender')
-      .max(30),
+      .transform((val) => toCapitalCase(val)),
+    gender: z.nativeEnum(Gender, {
+      errorMap: () => ({ message: 'Please select Male, Female, or Other' })
+    }),
     age: z.preprocess(
       (val) => (val === null || val === '' || val === undefined ? undefined : val),
       z.coerce
@@ -147,10 +46,32 @@ export const publicPartnerRegisterSchema = z
         .min(18, 'You must be at least 18 years old to join the IOTA Academy Affiliate Program')
         .max(99, 'Age must be less than 100 (Age >= 18 and < 100)')
     ),
-    socialLink: z.string().trim().max(1000, 'Social media link must be at most 1000 characters').optional().nullable(),
-    otherBusiness: z.string().trim().max(150, 'Occupation specification must be at most 150 characters').optional().nullable(),
-    businessName: z.string().trim().max(150, 'Firm Name must be at most 150 characters').optional().nullable(),
-    address: z
+    mobileNumber: z
+      .string({ required_error: 'Mobile number is required' })
+      .transform(normalizeIndianPhone)
+      .refine((val) => INDIAN_PHONE_REGEX.test(val), {
+        message: 'Please enter a valid 10-digit Indian mobile number starting with 6–9'
+      }),
+    whatsappNumber: z
+      .string({ required_error: 'WhatsApp number is required' })
+      .transform(normalizeIndianPhone)
+      .refine((val) => INDIAN_PHONE_REGEX.test(val), {
+        message: 'Please enter a valid 10-digit Indian WhatsApp number starting with 6–9'
+      }),
+    emailAddress: z
+      .string({ required_error: 'Email address is required' })
+      .trim()
+      .min(1, 'Email address is required')
+      .max(255, 'Email address must be at most 255 characters')
+      .email('Please enter a valid email address'),
+    password: z
+      .string({ required_error: 'Password is required' })
+      .min(8, 'Password must be at least 8 characters long')
+      .regex(/[A-Za-z]/, 'Password must contain at least one alphabet letter')
+      .regex(/[0-9]/, 'Password must contain at least one digit (0–9)')
+      .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
+    confirmPassword: z.string({ required_error: 'Please confirm your password' }),
+    communicationAddress: z
       .string({ required_error: 'Communication address is required' })
       .trim()
       .min(3, 'Please enter your communication address')
@@ -159,35 +80,42 @@ export const publicPartnerRegisterSchema = z
       .string({ required_error: 'City is required' })
       .trim()
       .min(2, 'Please enter your city')
-      .max(100, 'City must be at most 100 characters')
-      .optional()
-      .nullable()
-      .transform((val) => (val ? toCapitalCase(val) : val)),
+      .max(80, 'City must be at most 80 characters')
+      .transform((val) => toCapitalCase(val)),
     state: z
       .string({ required_error: 'State is required' })
       .trim()
-      .min(2, 'State is required'),
+      .min(2, 'State is required')
+      .max(80, 'State must be at most 80 characters'),
     pincode: z
       .string({ required_error: 'Pincode is required' })
       .trim()
       .regex(/^\d{6}$/, 'Please enter a valid 6-digit PIN code'),
+    tellUsMoreAboutYourself: z
+      .string()
+      .trim()
+      .max(500, 'Bio must be at most 500 characters')
+      .optional()
+      .nullable(),
+    occupation: z.nativeEnum(Occupation, {
+      errorMap: () => ({ message: 'Please select a valid occupation' })
+    }),
+
+    // Conditional occupation fields collected during registration (remaining occupation fields are collected during KYC)
+    influencerLinks: z
+      .array(z.string().trim().max(300, 'Each social link must be at most 300 characters'))
+      .max(5, 'Maximum 5 social links allowed')
+      .optional()
+      .nullable(),
+    firmName: z.string().trim().max(150).optional().nullable(),
+    specifyOccupation: z.string().trim().max(150).optional().nullable(),
+    otherOccupationName: z.string().trim().max(150).optional().nullable(),
+    otherOccupationDescribe: z.string().trim().max(1000).optional().nullable(),
+
     whatsappVerificationToken: z.string().trim().optional().nullable(),
-    emailVerificationToken: z.string().trim().optional().nullable(),
-    notes: z.string().trim().max(500, 'Notes must be at most 500 characters').optional().nullable()
+    emailVerificationToken: z.string().trim().optional().nullable()
   })
   .superRefine((data, ctx) => {
-    const chosen = (data.occupation || data.category || '').trim();
-    const lower = chosen.toLowerCase();
-
-    const fullName = (data.fullName || `${data.firstName || ''} ${data.lastName || ''}`).trim();
-    if (!fullName) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['firstName'],
-        message: 'Full name is required'
-      });
-    }
-
     if (data.password !== data.confirmPassword) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -196,28 +124,26 @@ export const publicPartnerRegisterSchema = z
       });
     }
 
-    if ((lower.includes('influencer') || lower.includes('creator')) && !data.socialLink?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['socialLink'],
-        message: 'Please provide your social media profile link for creator verification'
-      });
-    }
+    switch (data.occupation) {
+      case Occupation.INFLUENCER: {
+        const links = (data.influencerLinks || []).map((l) => l.trim()).filter(Boolean);
+        if (links.length === 0) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['influencerLinks'], message: 'Please provide at least one social media profile link' });
+        }
+        break;
+      }
 
-    if (lower.includes('other') && !data.otherBusiness?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['otherBusiness'],
-        message: 'Please specify your occupation'
-      });
-    }
+      case Occupation.OTHER:
+        if (!data.otherOccupationName?.trim() && !data.specifyOccupation?.trim()) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['otherOccupationName'], message: 'Please specify your occupation name' });
+        }
+        if (!data.otherOccupationDescribe?.trim()) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['otherOccupationDescribe'], message: 'Please describe your occupation' });
+        }
+        break;
 
-    if (chosen && !isIndividualOccupation(chosen) && !data.businessName?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['businessName'],
-        message: 'Please enter your Firm Name'
-      });
+      default:
+        break;
     }
   });
 

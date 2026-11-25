@@ -44,7 +44,7 @@ export class PublicController {
       res.status(201).json({
         success: true,
         data: result,
-        message: 'Your affiliate account has been registered and activated successfully! You can now log in to your dashboard.'
+        message: 'Affiliate application submitted successfully. Your profile is currently pending approval.'
       });
     } catch (err) {
       next(err);

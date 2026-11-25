@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { LeadStatus, AdmissionStatus, SettlementStatus, Role } from '../shared';
 import { ExportQueryInput, ReportFilterInput } from '../validators/report.validator';
+import { formatAffiliateBusinessName, formatFullName, formatOccupationLabel } from '../utils/user-display';
 
 export class ReportService {
   /**
@@ -48,8 +49,8 @@ export class ReportService {
           }
         }
       }),
-      prisma.partner.count(),
-      prisma.partner.count({ where: { status: 'ACTIVE' } }),
+      prisma.affiliate.count(),
+      prisma.affiliate.count({ where: { status: 'ACTIVE' } }),
       prisma.admission.aggregate({
         where: { status: { in: [AdmissionStatus.VERIFIED, AdmissionStatus.PENDING_VERIFICATION] } },
         _sum: { paidFee: true }
@@ -110,15 +111,17 @@ export class ReportService {
    * Partner ROI & Attribution Ranking
    */
   async getPartnerRoiReport(limit = 10) {
-    const partners = await prisma.partner.findMany({
+    const partners = await prisma.affiliate.findMany({
       where: { status: 'ACTIVE' },
       select: {
         id: true,
-        partnerCode: true,
-        businessName: true,
-        category: true,
+        affiliateCode: true,
+        firstName: true,
+        lastName: true,
+        firmName: true,
+        occupation: true,
         city: true,
-        area: true,
+        state: true,
         _count: {
           select: {
             leads: true,
@@ -148,10 +151,10 @@ export class ReportService {
 
       return {
         id: p.id,
-        partnerCode: p.partnerCode,
-        businessName: p.businessName,
-        category: p.category,
-        location: `${p.area}, ${p.city}`,
+        partnerCode: p.affiliateCode,
+        businessName: formatAffiliateBusinessName(p),
+        contactPerson: formatOccupationLabel(p.occupation),
+        location: `${p.city}, ${p.state}`,
         totalLeads,
         admissionsConverted: totalCommissions,
         conversionRate: parseFloat(conversionRate),
@@ -172,9 +175,10 @@ export class ReportService {
       where: { role: Role.COUNSELLOR, isActive: true },
       select: {
         id: true,
-        fullName: true,
-        email: true,
-        phone: true,
+        firstName: true,
+        lastName: true,
+        emailAddress: true,
+        mobileNumber: true,
         _count: {
           select: {
             leadAssignments: true,
@@ -210,9 +214,9 @@ export class ReportService {
 
       return {
         id: c.id,
-        name: c.fullName,
-        email: c.email,
-        phone: c.phone,
+        name: formatFullName(c.firstName, c.lastName),
+        email: c.emailAddress,
+        phone: c.mobileNumber,
         totalAssigned: assigned,
         admitted: converted,
         inProgress,
@@ -231,9 +235,10 @@ export class ReportService {
       where: { role: Role.SALES, isActive: true },
       select: {
         id: true,
-        fullName: true,
-        email: true,
-        phone: true,
+        firstName: true,
+        lastName: true,
+        emailAddress: true,
+        mobileNumber: true,
         _count: {
           select: {
             assignedVisits: true
@@ -258,9 +263,9 @@ export class ReportService {
 
       return {
         id: s.id,
-        name: s.fullName,
-        email: s.email,
-        phone: s.phone,
+        name: formatFullName(s.firstName, s.lastName),
+        email: s.emailAddress,
+        phone: s.mobileNumber,
         totalVisits,
         geofenceCompliantVisits: validGeoVisits,
         complianceRate: geofenceCompliance
@@ -311,10 +316,10 @@ export class ReportService {
       const leads = await prisma.lead.findMany({
         where,
         include: {
-          partner: { select: { partnerCode: true, businessName: true } },
+          partner: { select: { affiliateCode: true, firstName: true, lastName: true, firmName: true, occupation: true } },
           assignments: {
             where: { isCurrent: true },
-            include: { counsellor: { select: { fullName: true } } },
+            include: { counsellor: { select: { firstName: true, lastName: true } } },
             take: 1
           }
         },
@@ -339,7 +344,8 @@ export class ReportService {
           return `"${val.replace(/"/g, '""')}"`;
         };
 
-        const counselorName = lead.assignments?.[0]?.counsellor?.fullName || 'Unassigned';
+        const counselorRef = lead.assignments?.[0]?.counsellor;
+        const counselorName = counselorRef ? formatFullName(counselorRef.firstName, counselorRef.lastName) : 'Unassigned';
         const attributionExpiry = new Date(lead.createdAt.getTime() + 60 * 24 * 60 * 60 * 1000);
 
         const line = [
@@ -347,8 +353,8 @@ export class ReportService {
           escapeCsv(lead.studentName),
           escapeCsv(phoneDisplay),
           escapeCsv(lead.city || 'N/A'),
-          escapeCsv(lead.partner?.partnerCode || 'DIRECT'),
-          escapeCsv(lead.partner?.businessName || 'Direct Intake'),
+          escapeCsv(lead.partner?.affiliateCode || 'DIRECT'),
+          escapeCsv(lead.partner ? formatAffiliateBusinessName(lead.partner) : 'Direct Intake'),
           escapeCsv(counselorName),
           escapeCsv(lead.status),
           escapeCsv(lead.createdAt.toISOString().slice(0, 10)),
@@ -418,8 +424,8 @@ export class ReportService {
 
       const line = [
         escapeCsv(s.settlementCode),
-        escapeCsv(s.partner.partnerCode),
-        escapeCsv(s.partner.businessName),
+        escapeCsv(s.partner.affiliateCode),
+        escapeCsv(formatAffiliateBusinessName(s.partner)),
         escapeCsv(s.periodStartDate.toISOString().slice(0, 10)),
         escapeCsv(s.periodEndDate.toISOString().slice(0, 10)),
         s.totalAmount.toString(),
@@ -427,7 +433,7 @@ export class ReportService {
         s.netPaidAmount.toString(),
         escapeCsv(s.status),
         escapeCsv(s.partner.bankAccountNumber ? `••••${s.partner.bankAccountNumber.slice(-4)}` : 'N/A'),
-        escapeCsv(s.partner.bankIfsc || 'N/A'),
+        escapeCsv(s.partner.bankIfscNumber || 'N/A'),
         escapeCsv(primaryTx?.paymentMode || 'N/A'),
         escapeCsv(primaryTx?.transactionRef || 'N/A'),
         escapeCsv(s.paidAt ? s.paidAt.toISOString().slice(0, 10) : 'UNPAID')

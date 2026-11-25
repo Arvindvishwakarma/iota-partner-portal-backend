@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-11-25T09:07:15.323Z",
+  "timestamp": "2026-11-25T12:50:15.054Z",
   "success": true,
   "transport": "nodemailer",
-  "toEmail": "pending.affiliate.test@example.com",
+  "toEmail": "arvindvish2588@gmail.com",
   "subject": "Thank you for registering with the IOTA Academy Affiliate Program!",
-  "messageId": "<17157741-8974-171d-68df-7e20074fa581@iotaacademy.in>"
+  "messageId": "<55888dc1-26d5-913e-a1c7-371b7d06f2ca@iotaacademy.in>"
 }

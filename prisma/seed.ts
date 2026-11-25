@@ -1,10 +1,10 @@
-import { PrismaClient, Role, PartnerCategory, PartnerStatus, PremisesStatus } from '@prisma/client';
+import { PrismaClient, Role, PartnerCategory, AffiliateStatus, PremisesStatus, Gender, Occupation } from '@prisma/client';
 import argon2 from 'argon2';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting IOTA Authorized Partner Portal Database Seeding...');
+  console.log('🌱 Starting IOTA Affiliate Program Database Seeding...');
 
   // Hash seed passwords
   const adminPasswordHash = await argon2.hash('Admin@IOTA2026!');
@@ -12,50 +12,70 @@ async function main() {
   const salesPasswordHash = await argon2.hash('Sales@IOTA2026!');
   const partnerPasswordHash = await argon2.hash('Partner@IOTA2026!');
 
+  const officeAddress = '1st Floor, GB Tower, Opp. Veda Business Park, Bhawarkua, Indore 452001';
+
   // 1. Seed Super Admin
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@iotaacademy.in' },
+    where: { emailAddress: 'admin@iotaacademy.in' },
     update: {},
     create: {
-      email: 'admin@iotaacademy.in',
-      passwordHash: adminPasswordHash,
-      fullName: 'IOTA Super Administrator',
-      phone: '+919800000001',
+      firstName: 'IOTA',
+      lastName: 'Administrator',
       role: Role.ADMIN,
+      gender: Gender.Other,
+      age: 30,
+      mobileNumber: '+919800000001',
+      whatsappNumber: '+919800000001',
+      emailAddress: 'admin@iotaacademy.in',
+      password: adminPasswordHash,
+      occupation: Occupation.WORKING_PROFESSIONAL,
+      communicationAddress: officeAddress,
       isActive: true
     }
   });
-  console.log(`✅ Admin created: ${admin.email}`);
+  console.log(`✅ Admin created: ${admin.emailAddress}`);
 
   // 2. Seed Academic Counselor
   const counsellor = await prisma.user.upsert({
-    where: { email: 'counsellor@iotaacademy.in' },
+    where: { emailAddress: 'counsellor@iotaacademy.in' },
     update: {},
     create: {
-      email: 'counsellor@iotaacademy.in',
-      passwordHash: counsellorPasswordHash,
-      fullName: 'Priya Sharma (Senior Counselor)',
-      phone: '+919800000002',
+      firstName: 'Priya',
+      lastName: 'Sharma',
       role: Role.COUNSELLOR,
+      gender: Gender.Female,
+      age: 28,
+      mobileNumber: '+919800000002',
+      whatsappNumber: '+919800000002',
+      emailAddress: 'counsellor@iotaacademy.in',
+      password: counsellorPasswordHash,
+      occupation: Occupation.WORKING_PROFESSIONAL,
+      communicationAddress: officeAddress,
       isActive: true
     }
   });
-  console.log(`✅ Counselor created: ${counsellor.email}`);
+  console.log(`✅ Counselor created: ${counsellor.emailAddress}`);
 
   // 3. Business Development Executive
   const sales = await prisma.user.upsert({
-    where: { email: 'sales@iotaacademy.in' },
+    where: { emailAddress: 'sales@iotaacademy.in' },
     update: {},
     create: {
-      email: 'sales@iotaacademy.in',
-      passwordHash: salesPasswordHash,
-      fullName: 'Vikram Singh (Field Sales)',
-      phone: '+919800000003',
+      firstName: 'Vikram',
+      lastName: 'Singh',
       role: Role.SALES,
+      gender: Gender.Male,
+      age: 27,
+      mobileNumber: '+919800000003',
+      whatsappNumber: '+919800000003',
+      emailAddress: 'sales@iotaacademy.in',
+      password: salesPasswordHash,
+      occupation: Occupation.WORKING_PROFESSIONAL,
+      communicationAddress: officeAddress,
       isActive: true
     }
   });
-  console.log(`✅ Sales Rep created: ${sales.email}`);
+  console.log(`✅ Sales Rep created: ${sales.emailAddress}`);
 
   // 4. Seed Master Courses
   const coursesData = [
@@ -133,50 +153,58 @@ async function main() {
     console.log('✅ Default Commission Rule seeded.');
   }
 
-  // 6. Seed Sample Authorized Partner
+  // 6. Seed Sample Authorized Affiliate
   const partnerUser = await prisma.user.upsert({
-    where: { email: 'partner@iotaacademy.in' },
+    where: { emailAddress: 'partner@iotaacademy.in' },
     update: {},
     create: {
-      email: 'partner@iotaacademy.in',
-      passwordHash: partnerPasswordHash,
-      fullName: 'Suresh Reddy (Center Director)',
-      phone: '+919800000004',
-      role: Role.PARTNER,
+      firstName: 'Suresh',
+      lastName: 'Reddy',
+      role: Role.AFFILIATE,
+      gender: Gender.Male,
+      age: 34,
+      mobileNumber: '+919800000004',
+      whatsappNumber: '+919800000004',
+      emailAddress: 'partner@iotaacademy.in',
+      password: partnerPasswordHash,
+      occupation: Occupation.BUSINESS_OWNER,
+      communicationAddress: officeAddress,
       isActive: true
     }
   });
 
-  const existingPartner = await prisma.partner.findUnique({
+  const existingPartner = await prisma.affiliate.findUnique({
     where: { userId: partnerUser.id }
   });
 
   if (!existingPartner) {
-    await prisma.partner.create({
+    await prisma.affiliate.create({
       data: {
         userId: partnerUser.id,
-        partnerCode: 'PTR-BLR-0001',
-        businessName: 'Apex Computer Education Hub',
-        category: PartnerCategory.COMPUTER_CENTER,
-        ownerName: 'Suresh Reddy',
-        contactPerson: 'Suresh Reddy',
-        mobile: '+919800000004',
-        email: 'partner@iotaacademy.in',
-        addressLine1: '',
+        affiliateCode: 'IAA00101',
+        firstName: 'Suresh',
+        lastName: 'Reddy',
+        gender: Gender.Male,
+        age: 34,
+        mobileNumber: '+919800000004',
+        whatsappNumber: '+919800000004',
+        emailAddress: 'partner@iotaacademy.in',
+        communicationAddress: officeAddress,
         city: 'Indore',
-        area: '',
+        state: 'Madhya Pradesh',
         pincode: '452001',
-        latitude: 12.9716,
-        longitude: 77.5946,
-        status: PartnerStatus.ACTIVE,
-        registrationUrl: 'https://affiliate.iotaacademy.in/register/PTR-BLR-0001',
-        bankAccountName: 'Apex Education Center',
+        occupation: Occupation.BUSINESS_OWNER,
+        firmName: 'Apex Computer Education Hub',
+        ownerBusinessType: 'Computer Center',
+        status: AffiliateStatus.ACTIVE,
+        registrationUrl: 'https://affiliate.iotaacademy.in/register/IAA00101',
+        bankAccountHolderName: 'Apex Education Center',
         bankName: 'HDFC Bank',
-        bankIfsc: 'HDFC0001234',
+        bankIfscNumber: 'HDFC0001234',
         bankAccountNumber: '89625451501234'
       }
     });
-    console.log('✅ Sample Authorized Partner created: PTR-BLR-0001');
+    console.log('✅ Sample Authorized Affiliate created: IAA00101');
   }
 
   // 7. Seed Sample Premises for Field Canvassing

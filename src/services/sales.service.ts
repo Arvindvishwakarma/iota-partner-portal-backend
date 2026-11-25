@@ -3,7 +3,8 @@ import { AppError } from '../middlewares/error.middleware';
 import {
   PremisesStatus,
   VisitStatus,
-  PartnerStatus,
+  AffiliateStatus,
+  Gender,
   Role,
   MAX_VISIT_PROXIMITY_METERS
 } from '../shared';
@@ -11,6 +12,7 @@ import { hashPassword } from '../utils/password';
 import { env } from '../config/environment';
 import { generateUniqueAffiliateCode } from '../utils/affiliate-code';
 import { toCapitalCase } from '../validators/public-partner.validator';
+import { formatAffiliateBusinessName, toPrismaOccupation } from '../utils/user-display';
 import {
   CheckInInput,
   CheckOutInput,
@@ -97,9 +99,11 @@ export class SalesService {
           }
         }
       }),
-      prisma.partner.count({
-        where: isSales ? { onboardedByUserId: salespersonId } : {}
-      }),
+      isSales
+        ? prisma.premisesVisit.count({
+            where: { salespersonId, status: VisitStatus.PARTNER_ONBOARDED }
+          })
+        : prisma.affiliate.count({ where: { deletedAt: null } }),
       // Single Active Visit in Progress (if any)
       prisma.premisesVisit.findFirst({
         where: {
@@ -153,9 +157,6 @@ export class SalesService {
     const premises = await prisma.premises.findMany({
       where,
       include: {
-        partner: {
-          select: { id: true, partnerCode: true, businessName: true, status: true }
-        },
         visits: {
           where: isSales ? { salespersonId } : {},
           orderBy: { createdAt: 'desc' },
@@ -376,67 +377,73 @@ export class SalesService {
         data: { currentStatus: nextPremisesStatus }
       });
 
-      // If status is PARTNER_ONBOARDED, ensure Partner record exists in PENDING_APPROVAL status for Super Admin review
+      // If status is PARTNER_ONBOARDED, ensure Affiliate record exists in PENDING_APPROVAL status for Super Admin review
       if (data.status === VisitStatus.PARTNER_ONBOARDED) {
-        const existingPartner = await tx.partner.findUnique({
-          where: { premisesId: visit!.premisesId }
+        const prem = await tx.premises.findUnique({
+          where: { id: visit!.premisesId }
         });
 
-        if (!existingPartner) {
-          const prem = await tx.premises.findUnique({
-            where: { id: visit!.premisesId }
+        if (prem) {
+          const rawPhone = prem.contactNumber.replace(/\D/g, '').slice(-10);
+          const normalizedMobile = rawPhone.length === 10 ? `+91${rawPhone}` : prem.contactNumber;
+          const email = `${rawPhone || prem.id.slice(0, 8)}@affiliate.iotaacademy.in`;
+
+          const existingAffiliate = await tx.affiliate.findFirst({
+            where: { OR: [{ emailAddress: email }, { mobileNumber: normalizedMobile }] }
           });
 
-          if (prem) {
-            const rawPhone = prem.contactNumber.replace(/\D/g, '');
-            const normalizedMobile = prem.contactNumber.startsWith('+91')
-              ? prem.contactNumber
-              : `+91${rawPhone}`;
-            const email = `${rawPhone || prem.id.slice(0, 8)}@partner.iotaacademy.in`;
-
+          if (!existingAffiliate) {
             let user = await tx.user.findFirst({
-              where: { OR: [{ email }, { phone: normalizedMobile }] }
+              where: { OR: [{ emailAddress: email }, { mobileNumber: normalizedMobile }] }
             });
+
+            const nameParts = prem.premisesName.trim().split(/\s+/);
+            const firstName = toCapitalCase(nameParts[0] || 'Affiliate');
+            const lastName = toCapitalCase(nameParts.slice(1).join(' ') || 'Partner');
 
             if (!user) {
               const defaultPasswordHash = await hashPassword('Partner@123456');
               user = await tx.user.create({
                 data: {
-                  email,
-                  phone: normalizedMobile,
-                  fullName: prem.premisesName,
-                  passwordHash: defaultPasswordHash,
-                  role: Role.PARTNER,
-                  isActive: false // Inactive until Super Admin accepts approval
+                  firstName,
+                  lastName,
+                  emailAddress: email,
+                  mobileNumber: normalizedMobile,
+                  whatsappNumber: normalizedMobile,
+                  password: defaultPasswordHash,
+                  role: Role.AFFILIATE as any,
+                  gender: Gender.Other as any,
+                  age: 25,
+                  occupation: toPrismaOccupation('Business Owner'),
+                  communicationAddress: prem.fullAddress,
+                  isActive: false
                 }
               });
             }
 
-            const partnerCode = await generateUniqueAffiliateCode(tx);
+            const affiliateCode = await generateUniqueAffiliateCode(tx);
             const frontendBase = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
-            const registrationUrl = `${frontendBase}/register/${partnerCode}`;
+            const registrationUrl = `${frontendBase}/register/${affiliateCode}`;
 
-            await tx.partner.create({
+            await tx.affiliate.create({
               data: {
                 userId: user.id,
-                premisesId: prem.id,
-                partnerCode,
-                businessName: prem.premisesName,
-                category: prem.category,
-                ownerName: prem.premisesName,
-                contactPerson: prem.premisesName,
-                mobile: normalizedMobile,
-                email,
-                addressLine1: prem.fullAddress,
-                addressLine2: null,
-                city: 'General',
-                area: 'General',
-                pincode: '560001',
-                latitude: prem.latitude,
-                longitude: prem.longitude,
+                affiliateCode,
                 registrationUrl,
-                status: PartnerStatus.PENDING_APPROVAL,
-                onboardedByUserId: salespersonId
+                firstName,
+                lastName,
+                gender: Gender.Other as any,
+                age: 25,
+                mobileNumber: normalizedMobile,
+                whatsappNumber: normalizedMobile,
+                emailAddress: email,
+                communicationAddress: prem.fullAddress,
+                city: 'Indore',
+                state: 'Madhya Pradesh',
+                pincode: '452001',
+                occupation: toPrismaOccupation('Business Owner'),
+                firmName: prem.premisesName,
+                status: AffiliateStatus.PENDING_APPROVAL
               }
             });
           }
@@ -496,18 +503,22 @@ export class SalesService {
    * Onboard Partner On-The-Spot (Direct Field Registration)
    */
   async onboardPartner(salespersonId: string, data: OnboardPartnerInput) {
-    // 1. Check duplicate email or phone
-    const normalizedMobile = data.mobile.startsWith('+91') ? data.mobile : `+91${data.mobile}`;
-    const [existingUser, existingPartner] = await Promise.all([
+    const cleanDigits = data.mobile.replace(/\D/g, '').slice(-10);
+    const normalizedMobile = `+91${cleanDigits}`;
+    const cleanWaDigits = (data.whatsapp || cleanDigits).replace(/\D/g, '').slice(-10);
+    const normalizedWhatsapp = `+91${cleanWaDigits}`;
+    const emailLower = data.email.trim().toLowerCase();
+
+    const [existingUser, existingAffiliate] = await Promise.all([
       prisma.user.findFirst({
-        where: { OR: [{ email: data.email }, { phone: normalizedMobile }] }
+        where: { OR: [{ emailAddress: emailLower }, { mobileNumber: normalizedMobile }] }
       }),
-      prisma.partner.findFirst({
-        where: { OR: [{ email: data.email }, { mobile: normalizedMobile }] }
+      prisma.affiliate.findFirst({
+        where: { OR: [{ emailAddress: emailLower }, { mobileNumber: normalizedMobile }] }
       })
     ]);
 
-    if (existingUser || existingPartner) {
+    if (existingUser || existingAffiliate) {
       throw new AppError(
         'A user or affiliate with this email or mobile phone number already exists',
         400,
@@ -515,61 +526,61 @@ export class SalesService {
       );
     }
 
-    // 2. Generate unique 6-character Affiliate Code e.g. 7K9M2X
-    const partnerCode = await generateUniqueAffiliateCode();
-
-    // 3. Hash default password
+    const affiliateCode = await generateUniqueAffiliateCode();
     const defaultPassword = 'Partner@123456';
     const passwordHash = await hashPassword(defaultPassword);
 
+    const nameParts = toCapitalCase(data.ownerName).split(/\s+/);
+    const firstName = nameParts[0] || 'Affiliate';
+    const lastName = nameParts.slice(1).join(' ') || 'Partner';
+
     const partner = await prisma.$transaction(async (tx) => {
-      // Create user login
       const user = await tx.user.create({
         data: {
-          email: data.email,
-          phone: normalizedMobile,
-          fullName: toCapitalCase(data.ownerName),
-          passwordHash,
-          role: Role.PARTNER,
+          firstName,
+          lastName,
+          emailAddress: emailLower,
+          mobileNumber: normalizedMobile,
+          whatsappNumber: normalizedWhatsapp,
+          password: passwordHash,
+          role: Role.AFFILIATE as any,
+          gender: Gender.Other as any,
+          age: 25,
+          occupation: toPrismaOccupation('Business Owner'),
+          communicationAddress: data.addressLine1,
           isActive: true
         }
       });
 
-      const registrationUrl = `${env.FRONTEND_URL}/register/${partnerCode}`;
+      const registrationUrl = `${env.FRONTEND_URL}/register/${affiliateCode}`;
 
-      // Create partner profile
-      const newPartner = await tx.partner.create({
+      const newPartner = await tx.affiliate.create({
         data: {
           userId: user.id,
-          partnerCode,
-          businessName: data.businessName,
-          category: data.category,
-          ownerName: toCapitalCase(data.ownerName),
-          contactPerson: data.contactPerson || toCapitalCase(data.ownerName),
-          mobile: normalizedMobile,
-          whatsapp: data.whatsapp ? `+91${data.whatsapp}` : normalizedMobile,
-          email: data.email,
-          addressLine1: data.addressLine1,
-          addressLine2: data.addressLine2 || null,
-          city: toCapitalCase(data.city),
-          area: data.area,
-          pincode: data.pincode,
-          latitude: data.latitude || null,
-          longitude: data.longitude || null,
+          affiliateCode,
           registrationUrl,
-          status: PartnerStatus.PENDING_APPROVAL,
-          onboardedByUserId: salespersonId,
-          premisesId: data.premisesId || null,
-          bankAccountName: data.bankAccountName || null,
+          firstName,
+          lastName,
+          gender: Gender.Other as any,
+          age: 25,
+          mobileNumber: normalizedMobile,
+          whatsappNumber: normalizedWhatsapp,
+          emailAddress: emailLower,
+          communicationAddress: data.addressLine1,
+          city: toCapitalCase(data.city),
+          state: 'Madhya Pradesh',
+          pincode: data.pincode,
+          occupation: toPrismaOccupation('Business Owner'),
+          firmName: data.businessName,
+          ownerBusinessType: data.category ? String(data.category).replace(/_/g, ' ') : null,
+          status: AffiliateStatus.PENDING_APPROVAL,
+          bankAccountHolderName: data.bankAccountName || null,
           bankAccountNumber: data.bankAccountNumber || null,
-          bankIfsc: data.bankIfsc || null,
-          bankName: data.bankName || null,
-          upiId: data.upiId || null,
-          onboardingFormImage: data.onboardingFormImage || null
+          bankIfscNumber: data.bankIfsc || null,
+          bankName: data.bankName || null
         }
       });
 
-      // If an onboarding form image was provided, also record it in partner documents
       if (data.onboardingFormImage) {
         try {
           await tx.partnerDocument.create({
@@ -588,14 +599,12 @@ export class SalesService {
         }
       }
 
-      // If linked to a premises, update premises and active visit
       if (data.premisesId) {
         await tx.premises.update({
           where: { id: data.premisesId },
           data: { currentStatus: PremisesStatus.PARTNER_ONBOARDED }
         });
 
-        // Mark active visit as PARTNER_ONBOARDED
         await tx.premisesVisit.updateMany({
           where: {
             premisesId: data.premisesId,
@@ -604,7 +613,7 @@ export class SalesService {
           },
           data: {
             status: VisitStatus.PARTNER_ONBOARDED,
-            remarks: `On-the-spot onboarded! Code: ${partnerCode}`
+            remarks: `On-the-spot onboarded! Code: ${affiliateCode}`
           }
         });
       }
@@ -612,22 +621,22 @@ export class SalesService {
       return newPartner;
     });
 
-    // Notify newly onboarded partner via WhatsApp and Email (First name only: e.g. "Hi Arvind")
-    const cleanWhatsapp = (data.whatsapp || data.mobile).replace(/\D/g, '').slice(-10);
-    const rawFirst = (data.ownerName || 'Partner').trim().split(/\s+/)[0];
-    const firstName = toCapitalCase(rawFirst);
-
-    whatsappOtpService.sendAffiliateRegistrationWhatsApp(cleanWhatsapp, firstName).catch((waErr) => {
+    whatsappOtpService.sendAffiliateRegistrationWhatsApp(cleanWaDigits, firstName).catch((waErr) => {
       console.warn('[Sales Onboard Partner WhatsApp] Dispatch warning:', waErr);
     });
 
     if (data.email) {
-      emailOtpService.sendAffiliateRegistrationEmail(data.email, firstName).catch((mailErr) => {
+      emailOtpService.sendAffiliateRegistrationEmail(emailLower, firstName).catch((mailErr) => {
         console.warn('[Sales Onboard Partner Email] Dispatch warning:', mailErr);
       });
     }
 
-    return partner;
+    return {
+      ...partner,
+      partnerCode: partner.affiliateCode,
+      businessName: formatAffiliateBusinessName(partner),
+      ownerName: `${partner.firstName} ${partner.lastName}`.trim()
+    };
   }
 
   /**
@@ -667,7 +676,7 @@ export class SalesService {
           status: true,
           createdAt: true,
           interestedCourse: { select: { name: true } },
-          partner: { select: { id: true, partnerCode: true, businessName: true } },
+          partner: { select: { id: true, affiliateCode: true, firstName: true, lastName: true, firmName: true, occupation: true } },
           admission: {
             select: {
               admissionCode: true,
@@ -686,7 +695,10 @@ export class SalesService {
     // Mask phone numbers to ensure student privacy: +91 98****3210
     const maskedLeads = leads.map((l) => ({
       ...l,
-      mobile: l.mobile.replace(/(\+91\d{2})\d{4}(\d{4})/, '$1****$2')
+      mobile: l.mobile.replace(/(\+91\d{2})\d{4}(\d{4})/, '$1****$2'),
+      partner: l.partner
+        ? { id: l.partner.id, partnerCode: l.partner.affiliateCode, businessName: formatAffiliateBusinessName(l.partner) }
+        : null
     }));
 
     return {

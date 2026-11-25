@@ -125,7 +125,7 @@ describe('Notification Hub API Security & RBAC Guards', () => {
   const partnerToken = generateAccessToken({
     userId: 'partner-user-id',
     email: 'partner@iotaacademy.in',
-    role: Role.PARTNER,
+    role: Role.AFFILIATE,
     partnerId: 'partner-uuid-1'
   });
 

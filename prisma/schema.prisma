@@ -17,7 +17,26 @@ enum Role {
   ADMIN
   COUNSELLOR
   SALES
+  AFFILIATE
   PARTNER
+}
+
+enum Gender {
+  Male
+  Female
+  Other
+}
+
+enum Occupation {
+  STUDENT               @map("Student")
+  INFLUENCER            @map("Influencer")
+  WORKING_PROFESSIONAL  @map("Working Professional")
+  EDUCATOR              @map("Educator")
+  FREELANCER            @map("Freelancer")
+  CONSULTANT            @map("Consultant")
+  SELF_EMPLOYED         @map("Self-employed")
+  BUSINESS_OWNER        @map("Business Owner")
+  OTHER                 @map("Other")
 }
 
 enum ContactStatus {
@@ -37,10 +56,13 @@ enum PartnerCategory {
   OTHER
 }
 
-enum PartnerStatus {
+enum AffiliateStatus {
   PENDING_APPROVAL
+  PROFILE_REJECTED
+  KYC_PENDING
+  KYC_REJECTED
+  KYC_REVISED
   ACTIVE
-  REJECTED
   SUSPENDED
   INACTIVE
 }
@@ -166,20 +188,26 @@ enum NotificationStatus {
 // -------------------------------------------------------------
 
 model User {
-  id              String       @id @default(uuid())
-  email           String       @unique
-  passwordHash    String       @map("password_hash")
-  fullName        String       @map("full_name")
-  phone           String       @unique
-  role            Role         @default(SALES)
-  isActive        Boolean      @default(true) @map("is_active")
-  avatarUrl       String?      @map("avatar_url")
-  lastLoginAt     DateTime?    @map("last_login_at")
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
-  deletedAt       DateTime?    @map("deleted_at")
+  id                   String       @id @default(uuid())
+  firstName            String       @map("first_name") @db.VarChar(60)
+  lastName             String       @map("last_name") @db.VarChar(60)
+  role                 Role         @default(AFFILIATE)
+  gender               Gender
+  age                  Int          @db.SmallInt
+  mobileNumber         String       @unique @map("mobile_number") @db.VarChar(15)
+  whatsappNumber       String       @map("whatsapp_number") @db.VarChar(15)
+  emailAddress         String       @unique @map("email_address") @db.VarChar(255)
+  password             String
+  occupation           Occupation
+  communicationAddress String       @map("communication_address")
+  isActive             Boolean      @default(true) @map("is_active")
+  avatarUrl            String?      @map("avatar_url")
+  lastLoginAt          DateTime?    @map("last_login_at")
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
+  deletedAt            DateTime?    @map("deleted_at")
 
-  partnerProfile     Partner?
+  affiliateProfile   Affiliate?
   refreshTokens      RefreshToken[]
   assignedVisits     PremisesVisit[]    @relation("SalesVisits")
   leadAssignments    LeadAssignment[]   @relation("CounsellorAssignments")
@@ -208,52 +236,76 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
-model Partner {
-  id                  String           @id @default(uuid())
-  userId              String           @unique @map("user_id")
-  partnerCode         String           @unique @map("partner_code")
-  businessName        String           @map("business_name")
-  category            PartnerCategory  @default(COMPUTER_CENTER)
-  ownerName           String           @map("owner_name")
-  contactPerson       String?          @map("contact_person")
-  mobile              String           @map("mobile")
-  whatsapp            String?          @map("whatsapp")
-  email               String           @map("email")
-  addressLine1        String           @map("address_line1")
-  addressLine2        String?          @map("address_line2")
-  city                String           @map("city")
-  area                String           @map("area")
-  pincode             String           @map("pincode")
-  latitude            Float?
-  longitude           Float?
-  qrCodeUrl           String?          @map("qr_code_url")
-  registrationUrl     String           @map("registration_url")
-  status              PartnerStatus    @default(PENDING_APPROVAL)
-  rejectionReason     String?          @map("rejection_reason")
-  bankAccountName     String?          @map("bank_account_name")
-  bankAccountNumber   String?          @map("bank_account_number")
-  bankIfsc            String?          @map("bank_ifsc")
-  bankName            String?          @map("bank_name")
-  upiId               String?          @map("upi_id")
-  onboardingFormImage String?          @map("onboarding_form_image")
-  onboardedByUserId   String?          @map("onboarded_by_user_id")
-  premisesId          String?          @unique @map("premises_id")
-  approvedAt          DateTime?        @map("approved_at")
-  createdAt           DateTime         @default(now()) @map("created_at")
-  updatedAt           DateTime         @updatedAt @map("updated_at")
-  deletedAt           DateTime?        @map("deleted_at")
+model Affiliate {
+  id                         String           @id @default(uuid())
+  userId                     String           @unique @map("user_id")
+  affiliateCode              String           @unique @map("affiliate_code") @db.VarChar(20)
+  registrationUrl            String           @map("registration_url")
+  qrCodeUrl                  String?          @map("qr_code_url")
+  rejectionReason            String?          @map("rejection_reason")
+  approvedAt                 DateTime?        @map("approved_at")
 
-  user                User             @relation(fields: [userId], references: [id], onDelete: Restrict)
-  premises            Premises?        @relation(fields: [premisesId], references: [id], onDelete: SetNull)
-  documents           PartnerDocument[]
-  leads               Lead[]
-  commissions         PartnerCommission[]
-  settlements         Settlement[]
-  supportTickets      SupportTicket[]
+  firstName                  String           @map("first_name") @db.VarChar(60)
+  lastName                   String           @map("last_name") @db.VarChar(60)
+  gender                     Gender
+  age                        Int              @db.SmallInt
+  dob                        DateTime?        @db.Date
+  mobileNumber               String           @map("mobile_number") @db.VarChar(15)
+  whatsappNumber             String           @map("whatsapp_number") @db.VarChar(15)
+  emailAddress               String           @map("email_address") @db.VarChar(255)
+  avatarUrl                  String?          @map("avatar_url")
+  communicationAddress       String           @map("communication_address")
+  permanentAddress           String?          @map("permanent_address")
+  city                       String           @db.VarChar(80)
+  state                      String           @db.VarChar(80)
+  pincode                    String           @db.VarChar(6)
+  tellUsMoreAboutYourself    String?          @map("tell_us_more_about_yourself")
+
+  occupation                 Occupation       @default(STUDENT)
+  influencerLinks            Json?            @map("influencer_links")
+  firmName                   String?          @map("firm_name") @db.VarChar(150)
+  ownerBusinessType          String?          @map("owner_business_type") @db.VarChar(100)
+  studentCollegeName         String?          @map("student_college_name") @db.VarChar(150)
+  studentCollegeDegree       String?          @map("student_college_degree") @db.VarChar(100)
+  studentCollegeYearSemester String?          @map("student_college_year_semester") @db.VarChar(50)
+  professionalCompanyName    String?          @map("professional_company_name") @db.VarChar(150)
+  professionalJobTitle       String?          @map("professional_job_title") @db.VarChar(100)
+  educatorInstituteName      String?          @map("educator_institute_name") @db.VarChar(150)
+  educatorInstituteType      String?          @map("educator_institute_type") @db.VarChar(80)
+  educatorDesignation        String?          @map("educator_designation") @db.VarChar(100)
+  educatorInstituteLocation  String?          @map("educator_institute_location") @db.VarChar(150)
+  freelancerWorkCategory     String?          @map("freelancer_work_category") @db.VarChar(100)
+  freelancerDescribeWork     String?          @map("freelancer_describe_work")
+  specifyOccupation          String?          @map("specify_occupation") @db.VarChar(150)
+  otherOccupationName        String?          @map("other_occupation_name") @db.VarChar(150)
+  otherOccupationDescribe    String?          @map("other_occupation_describe")
+
+  aadharCardNumber           String?          @map("aadhar_card_number") @db.VarChar(12)
+  panCardNumber              String?          @map("pan_card_number") @db.VarChar(10)
+  aadharCardFrontUrl         String?          @map("aadhar_card_front_url")
+  aadharCardBackUrl          String?          @map("aadhar_card_back_url")
+  panCardFrontUrl            String?          @map("pan_card_front_url")
+  panCardBackUrl             String?          @map("pan_card_back_url")
+  bankAccountHolderName      String?          @map("bank_account_holder_name") @db.VarChar(150)
+  bankAccountNumber          String?          @map("bank_account_number") @db.VarChar(30)
+  bankIfscNumber             String?          @map("bank_ifsc_number") @db.VarChar(11)
+  bankName                   String?          @map("bank_name") @db.VarChar(100)
+  bankProof                  String?          @map("bank_proof")
+  status                     AffiliateStatus  @default(PENDING_APPROVAL)
+  createdAt                  DateTime         @default(now()) @map("created_at")
+  updatedAt                  DateTime         @updatedAt @map("updated_at")
+  deletedAt                  DateTime?        @map("deleted_at")
+
+  user                       User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  documents                  PartnerDocument[]
+  leads                      Lead[]
+  commissions                PartnerCommission[]
+  settlements                Settlement[]
+  supportTickets             SupportTicket[]
 
   @@index([status, city])
-  @@index([partnerCode])
-  @@map("partners")
+  @@index([affiliateCode])
+  @@map("affiliates")
 }
 
 model PartnerDocument {
@@ -267,7 +319,7 @@ model PartnerDocument {
   isVerified    Boolean   @default(false) @map("is_verified")
   createdAt     DateTime  @default(now()) @map("created_at")
 
-  partner       Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  partner       Affiliate @relation(fields: [partnerId], references: [id], onDelete: Cascade)
 
   @@index([partnerId])
   @@map("partner_documents")
@@ -290,7 +342,6 @@ model Premises {
   updatedAt           DateTime         @updatedAt @map("updated_at")
   deletedAt           DateTime?        @map("deleted_at")
 
-  partner             Partner?
   visits              PremisesVisit[]
 
   @@index([currentStatus])
@@ -362,7 +413,7 @@ model Lead {
   createdAt            DateTime         @default(now()) @map("created_at")
   updatedAt            DateTime         @updatedAt @map("updated_at")
 
-  partner              Partner?         @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  partner              Affiliate?       @relation(fields: [partnerId], references: [id], onDelete: SetNull)
   interestedCourse     Course?          @relation(fields: [interestedCourseId], references: [id], onDelete: SetNull)
   activities           LeadActivity[]
   assignments          LeadAssignment[]
@@ -498,7 +549,7 @@ model PartnerCommission {
   createdAt          DateTime         @default(now()) @map("created_at")
   updatedAt          DateTime         @updatedAt @map("updated_at")
 
-  partner            Partner          @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+  partner            Affiliate        @relation(fields: [partnerId], references: [id], onDelete: Restrict)
   admission          Admission        @relation(fields: [admissionId], references: [id], onDelete: Restrict)
   commissionRule     CommissionRule?  @relation(fields: [commissionRuleId], references: [id], onDelete: SetNull)
   settlement         Settlement?      @relation(fields: [settlementId], references: [id], onDelete: SetNull)
@@ -525,7 +576,7 @@ model Settlement {
   createdAt           DateTime           @default(now()) @map("created_at")
   updatedAt           DateTime           @updatedAt @map("updated_at")
 
-  partner             Partner            @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+  partner             Affiliate          @relation(fields: [partnerId], references: [id], onDelete: Restrict)
   commissions         PartnerCommission[]
   transactions        SettlementTransaction[]
 
@@ -582,7 +633,7 @@ model SupportTicket {
   createdAt        DateTime        @default(now()) @map("created_at")
   updatedAt        DateTime        @updatedAt @map("updated_at")
 
-  partner          Partner         @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  partner          Affiliate       @relation(fields: [partnerId], references: [id], onDelete: Cascade)
   creator          User            @relation("TicketCreator", fields: [createdById], references: [id], onDelete: Restrict)
   assignee         User?           @relation("TicketAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
 

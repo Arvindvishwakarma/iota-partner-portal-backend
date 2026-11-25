@@ -24,7 +24,7 @@ export const checkOutSchema = updateVisitStatusSchema;
 export const onboardPartnerSchema = z.object({
   premisesId: z.string().uuid().optional().nullable(),
   businessName: z.string().min(3, 'Business name must be at least 3 characters').max(100),
-  category: z.nativeEnum(PartnerCategory),
+  category: z.nativeEnum(PartnerCategory).optional(),
   ownerName: z
     .string()
     .min(2, 'Owner name must be at least 2 characters')

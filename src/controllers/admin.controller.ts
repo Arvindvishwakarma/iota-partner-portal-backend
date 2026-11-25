@@ -2,7 +2,7 @@ import { Response, NextFunction } from 'express';
 import { adminService } from '../services/admin.service';
 import { salesService } from '../services/sales.service';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
-import { PartnerCategory, PartnerStatus, PremisesStatus, Role, VisitStatus } from '../shared';
+import { AffiliateStatus, PartnerCategory, PremisesStatus, Role, VisitStatus } from '../shared';
 
 export class AdminController {
   async getDashboard(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -74,7 +74,7 @@ export class AdminController {
   // Partner Handlers
   async listPartners(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const status = req.query.status as PartnerStatus | undefined;
+      const status = req.query.status as AffiliateStatus | undefined;
       const category = req.query.category as PartnerCategory | undefined;
       const search = req.query.search as string | undefined;
       const city = req.query.city as string | undefined;
@@ -106,7 +106,7 @@ export class AdminController {
       res.status(200).json({
         success: true,
         data: updated,
-        message: status === PartnerStatus.ACTIVE ? 'Partner approved and unique ID generated' : 'Partner registration rejected'
+        message: status === AffiliateStatus.ACTIVE ? 'Affiliate approved and unique ID generated' : 'Affiliate status updated'
       });
     } catch (err) {
       next(err);

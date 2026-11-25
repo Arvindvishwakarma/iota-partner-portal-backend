@@ -2,6 +2,7 @@ import { prisma } from '../config/prisma';
 import { AppError } from '../middlewares/error.middleware';
 import { hashPassword, verifyPassword } from '../utils/password';
 import { generateAccessToken, verifyAccessToken } from '../utils/jwt';
+import { buildAuthenticatedUser } from '../utils/user-display';
 import { AuthenticatedUser, JwtUserPayload, Role } from '../shared';
 import { logger } from '../config/logger';
 
@@ -10,7 +11,7 @@ export class AuthService {
    * Authenticate user with Email or Mobile Number and Password
    * Issues a non-expiring persistent access token (valid until user logs out)
    */
-  async login(identifier: string, passwordPlain: string, ipAddress?: string, userAgent?: string) {
+  async login(identifier: string, passwordPlain: string, ipAddress?: string, _userAgent?: string) {
     const cleanSearch = identifier.trim();
     const cleanDigits = cleanSearch.replace(/\D/g, '');
     const isPhoneLike = cleanDigits.length >= 10;
@@ -20,22 +21,22 @@ export class AuthService {
     const user = await prisma.user.findFirst({
       where: {
         OR: [
-          { email: cleanSearch.toLowerCase() },
+          { emailAddress: { equals: cleanSearch.toLowerCase(), mode: 'insensitive' } },
           ...(isPhoneLike
             ? [
-                { email: phone10 },
-                { phone: phone10 },
-                { phone: normalizedMobile },
-                { phone: cleanDigits },
-                { phone: { endsWith: phone10 } }
+                { emailAddress: phone10 },
+                { mobileNumber: phone10 },
+                { mobileNumber: normalizedMobile },
+                { mobileNumber: cleanDigits },
+                { mobileNumber: { endsWith: phone10 } }
               ]
             : [])
         ],
         deletedAt: null
       },
       include: {
-        partnerProfile: {
-          select: { id: true, partnerCode: true, status: true, rejectionReason: true }
+        affiliateProfile: {
+          select: { id: true, affiliateCode: true, status: true, rejectionReason: true }
         }
       }
     });
@@ -48,45 +49,29 @@ export class AuthService {
       throw new AppError('Your account has been deactivated. Please contact an administrator.', 403, 'ACCOUNT_DEACTIVATED');
     }
 
-    const isMatch = await verifyPassword(passwordPlain, user.passwordHash);
+    const isMatch = await verifyPassword(passwordPlain, user.password);
     if (!isMatch) {
       throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
     }
 
-    // Determine Partner ID if role is PARTNER
-    const partnerId = user.partnerProfile?.id;
+    const partnerId = user.affiliateProfile?.id;
 
-    // Issue Non-Expiring JWT Access Token (Persistent until Logout)
     const tokenPayload: JwtUserPayload = {
       userId: user.id,
-      email: user.email,
+      email: user.emailAddress,
       role: user.role as Role,
       partnerId
     };
     const accessToken = generateAccessToken(tokenPayload);
 
-    // Update last login timestamp
     await prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() }
     });
 
-    // Audit log
-    logger.info(`User logged in: ${user.email} (${user.role}) [IP: ${ipAddress || 'unknown'}]`);
+    logger.info(`User logged in: ${user.emailAddress} (${user.role}) [IP: ${ipAddress || 'unknown'}]`);
 
-    const sanitizedUser: AuthenticatedUser = {
-      id: user.id,
-      email: user.email,
-      fullName: user.fullName,
-      phone: user.phone,
-      role: user.role as Role,
-      isActive: user.isActive,
-      avatarUrl: user.avatarUrl,
-      partnerId,
-      partnerCode: user.partnerProfile?.partnerCode,
-      partnerStatus: user.partnerProfile?.status as any,
-      rejectionReason: user.partnerProfile?.rejectionReason || null
-    };
+    const sanitizedUser = buildAuthenticatedUser(user, user.affiliateProfile);
 
     return {
       user: sanitizedUser,
@@ -129,7 +114,9 @@ export class AuthService {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        partnerProfile: { select: { id: true, partnerCode: true, status: true, rejectionReason: true } }
+        affiliateProfile: {
+          select: { id: true, affiliateCode: true, status: true, rejectionReason: true }
+        }
       }
     });
 
@@ -137,19 +124,7 @@ export class AuthService {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
-    return {
-      id: user.id,
-      email: user.email,
-      fullName: user.fullName,
-      phone: user.phone,
-      role: user.role as Role,
-      isActive: user.isActive,
-      avatarUrl: user.avatarUrl,
-      partnerId: user.partnerProfile?.id,
-      partnerCode: user.partnerProfile?.partnerCode,
-      partnerStatus: user.partnerProfile?.status as any,
-      rejectionReason: user.partnerProfile?.rejectionReason || null
-    };
+    return buildAuthenticatedUser(user, user.affiliateProfile);
   }
 
   /**
@@ -161,7 +136,7 @@ export class AuthService {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
-    const isMatch = await verifyPassword(currentPasswordPlain, user.passwordHash);
+    const isMatch = await verifyPassword(currentPasswordPlain, user.password);
     if (!isMatch) {
       throw new AppError('Incorrect current password', 400, 'INCORRECT_PASSWORD');
     }
@@ -170,10 +145,10 @@ export class AuthService {
 
     await prisma.user.update({
       where: { id: userId },
-      data: { passwordHash: newHash }
+      data: { password: newHash }
     });
 
-    logger.info(`Password successfully changed for user: ${user.email}.`);
+    logger.info(`Password successfully changed for user: ${user.emailAddress}.`);
   }
 }
 

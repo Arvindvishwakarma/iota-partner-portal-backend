@@ -7,38 +7,18 @@ import { prisma } from '../config/prisma';
 export async function generateUniqueAffiliateCode(
   dbClient: any = prisma
 ): Promise<string> {
-  // If previous test partner LN7SW7 exists, upgrade it to IAA00101
-  try {
-    const lnPartner = await dbClient.partner.findUnique({
-      where: { partnerCode: 'LN7SW7' }
-    });
-    if (lnPartner) {
-      const frontendBase = (process.env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
-      await dbClient.partner.update({
-        where: { id: lnPartner.id },
-        data: {
-          partnerCode: 'IAA00101',
-          registrationUrl: `${frontendBase}/register/IAA00101`
-        }
-      });
-    }
-  } catch {
-    // Ignore if not found
-  }
-
-  // Find all existing partners with IAA prefix
-  const existingPartners = await dbClient.partner.findMany({
+  const existingAffiliates = await dbClient.affiliate.findMany({
     where: {
-      partnerCode: {
+      affiliateCode: {
         startsWith: 'IAA'
       }
     },
-    select: { partnerCode: true }
+    select: { affiliateCode: true }
   });
 
   let maxSeq = 100; // Base: starting before 101, so the first code generated is IAA00101
-  for (const p of existingPartners) {
-    const match = (p.partnerCode || '').match(/^IAA(\d+)$/i);
+  for (const a of existingAffiliates) {
+    const match = (a.affiliateCode || '').match(/^IAA(\d+)$/i);
     if (match) {
       const num = parseInt(match[1], 10);
       if (!isNaN(num) && num > maxSeq) {
@@ -50,8 +30,8 @@ export async function generateUniqueAffiliateCode(
   let nextSeq = maxSeq + 1;
   while (true) {
     const candidate = `IAA${nextSeq.toString().padStart(5, '0')}`;
-    const existing = await dbClient.partner.findUnique({
-      where: { partnerCode: candidate },
+    const existing = await dbClient.affiliate.findUnique({
+      where: { affiliateCode: candidate },
       select: { id: true }
     });
     if (!existing) {

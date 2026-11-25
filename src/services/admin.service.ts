@@ -4,17 +4,53 @@ import { AppError } from '../middlewares/error.middleware';
 import { hashPassword } from '../utils/password';
 import {
   Role,
-  PartnerStatus,
+  AffiliateStatus,
   PartnerCategory,
   PremisesStatus,
   VisitStatus,
   LeadStatus,
   LeadActivityType,
   AdmissionStatus,
-  CommissionStatus
+  CommissionStatus,
+  Gender
 } from '../shared';
 import { env } from '../config/environment';
 import { generateUniqueAffiliateCode, isLegacyProvisionalCode } from '../utils/affiliate-code';
+import {
+  formatAffiliateBusinessName,
+  formatFullName,
+  formatOccupationLabel,
+  toPrismaOccupation
+} from '../utils/user-display';
+
+function mapStaffRow(u: any) {
+  return {
+    ...u,
+    fullName: formatFullName(u.firstName, u.lastName),
+    email: u.emailAddress,
+    phone: u.mobileNumber
+  };
+}
+
+function mapAffiliateRow(a: any) {
+  const occupationLabel = formatOccupationLabel(a.occupation);
+  return {
+    ...a,
+    partnerCode: a.affiliateCode,
+    businessName: formatAffiliateBusinessName(a),
+    ownerName: formatFullName(a.firstName, a.lastName),
+    contactPerson: occupationLabel,
+    occupationLabel,
+    influencerLinks: Array.isArray(a.influencerLinks) ? a.influencerLinks : [],
+    mobile: a.mobileNumber,
+    whatsapp: a.whatsappNumber,
+    email: a.emailAddress,
+    addressLine1: a.communicationAddress,
+    bankAccountName: a.bankAccountHolderName,
+    bankIfsc: a.bankIfscNumber,
+    user: a.user ? mapStaffRow(a.user) : undefined
+  };
+}
 
 export class AdminService {
   /**
@@ -47,9 +83,9 @@ export class AdminService {
           }
         }
       }),
-      prisma.partner.count({ where: { deletedAt: null } }),
-      prisma.partner.count({ where: { status: PartnerStatus.ACTIVE, deletedAt: null } }),
-      prisma.partner.count({ where: { status: PartnerStatus.PENDING_APPROVAL, deletedAt: null } }),
+      prisma.affiliate.count({ where: { deletedAt: null } }),
+      prisma.affiliate.count({ where: { status: AffiliateStatus.ACTIVE, deletedAt: null } }),
+      prisma.affiliate.count({ where: { status: AffiliateStatus.PENDING_APPROVAL, deletedAt: null } }),
       prisma.admission.count(),
       prisma.admission.count({ where: { status: AdmissionStatus.VERIFIED } }),
       prisma.premisesVisit.count(),
@@ -59,17 +95,18 @@ export class AdminService {
         by: ['status'],
         _sum: { commissionAmount: true }
       }),
-      prisma.partner.findMany({
-        where: { status: PartnerStatus.PENDING_APPROVAL, deletedAt: null },
+      prisma.affiliate.findMany({
+        where: { status: AffiliateStatus.PENDING_APPROVAL, deletedAt: null },
         select: {
           id: true,
-          partnerCode: true,
-          businessName: true,
-          ownerName: true,
-          category: true,
+          affiliateCode: true,
+          firstName: true,
+          lastName: true,
+          firmName: true,
+          occupation: true,
           city: true,
-          area: true,
-          mobile: true,
+          state: true,
+          mobileNumber: true,
           createdAt: true
         },
         orderBy: { createdAt: 'desc' },
@@ -83,7 +120,7 @@ export class AdminService {
           city: true,
           status: true,
           createdAt: true,
-          partner: { select: { businessName: true, partnerCode: true } }
+          partner: { select: { affiliateCode: true, firstName: true, lastName: true, firmName: true, occupation: true } }
         },
         orderBy: { createdAt: 'desc' },
         take: 5
@@ -136,8 +173,25 @@ export class AdminService {
         total: totalContacts,
         new: newContacts
       },
-      recentPendingPartners,
-      recentLeads,
+      recentPendingPartners: recentPendingPartners.map((a) => ({
+        id: a.id,
+        partnerCode: a.affiliateCode,
+        businessName: formatAffiliateBusinessName(a),
+        ownerName: formatFullName(a.firstName, a.lastName),
+        firmName: a.firmName || null,
+        contactPerson: formatOccupationLabel(a.occupation),
+        city: a.city,
+        state: a.state,
+        area: a.state,
+        mobile: a.mobileNumber,
+        createdAt: a.createdAt
+      })),
+      recentLeads: recentLeads.map((l) => ({
+        ...l,
+        partner: l.partner
+          ? { partnerCode: l.partner.affiliateCode, businessName: formatAffiliateBusinessName(l.partner) }
+          : null
+      })),
       recentContacts
     };
   }
@@ -158,9 +212,10 @@ export class AdminService {
 
     if (search) {
       where.OR = [
-        { fullName: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search } }
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { emailAddress: { contains: search, mode: 'insensitive' } },
+        { mobileNumber: { contains: search } }
       ];
     }
 
@@ -170,9 +225,10 @@ export class AdminService {
         where,
         select: {
           id: true,
-          fullName: true,
-          email: true,
-          phone: true,
+          firstName: true,
+          lastName: true,
+          emailAddress: true,
+          mobileNumber: true,
           role: true,
           isActive: true,
           avatarUrl: true,
@@ -192,15 +248,19 @@ export class AdminService {
     ]);
 
     return {
-      staff,
+      staff: staff.map(mapStaffRow),
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) }
     };
   }
 
   async createStaff(data: { fullName: string; email: string; phone: string; password?: string; role: Role }) {
+    const emailLower = data.email.toLowerCase().trim();
+    const cleanDigits = data.phone.replace(/\D/g, '').slice(-10);
+    const normalizedMobile = cleanDigits.length === 10 ? `+91${cleanDigits}` : data.phone.trim();
+
     const existing = await prisma.user.findFirst({
       where: {
-        OR: [{ email: data.email.toLowerCase() }, { phone: data.phone }]
+        OR: [{ emailAddress: emailLower }, { mobileNumber: normalizedMobile }, { mobileNumber: data.phone.trim() }]
       }
     });
 
@@ -208,51 +268,62 @@ export class AdminService {
       throw new AppError('A user with this email or phone number already exists', 400, 'USER_EXISTS');
     }
 
+    const parts = data.fullName.trim().split(/\s+/);
+    const firstName = parts[0] || 'Staff';
+    const lastName = parts.slice(1).join(' ') || 'Member';
     const defaultPassword = data.password || 'IOTA@Welcome2026!';
     const passwordHash = await hashPassword(defaultPassword);
 
     const user = await prisma.user.create({
       data: {
-        fullName: data.fullName,
-        email: data.email.toLowerCase(),
-        phone: data.phone,
-        passwordHash,
-        role: data.role,
+        firstName,
+        lastName,
+        emailAddress: emailLower,
+        mobileNumber: normalizedMobile,
+        whatsappNumber: normalizedMobile,
+        password: passwordHash,
+        role: data.role as any,
+        gender: Gender.Other as any,
+        age: 25,
+        occupation: toPrismaOccupation('Working Professional'),
+        communicationAddress: 'IOTA Academy Office, Indore',
         isActive: true
       },
       select: {
         id: true,
-        fullName: true,
-        email: true,
-        phone: true,
+        firstName: true,
+        lastName: true,
+        emailAddress: true,
+        mobileNumber: true,
         role: true,
         isActive: true,
         createdAt: true
       }
     });
 
-    return user;
+    return mapStaffRow(user);
   }
 
   async updateStaffStatus(userId: string, isActive: boolean) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
 
-    return prisma.user.update({
+    const updated = await prisma.user.update({
       where: { id: userId },
       data: { isActive },
-      select: { id: true, fullName: true, email: true, isActive: true }
+      select: { id: true, firstName: true, lastName: true, emailAddress: true, isActive: true }
     });
+    return mapStaffRow(updated);
   }
 
   async updateStaff(userId: string, data: { fullName?: string; email?: string; phone?: string; isActive?: boolean }) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
 
-    if (data.email && data.email.toLowerCase() !== user.email.toLowerCase()) {
+    if (data.email && data.email.toLowerCase() !== user.emailAddress.toLowerCase()) {
       const existingEmail = await prisma.user.findFirst({
         where: {
-          email: data.email.toLowerCase().trim(),
+          emailAddress: data.email.toLowerCase().trim(),
           id: { not: userId }
         }
       });
@@ -261,10 +332,10 @@ export class AdminService {
       }
     }
 
-    if (data.phone && data.phone.trim() !== user.phone) {
+    if (data.phone && data.phone.trim() !== user.mobileNumber) {
       const existingPhone = await prisma.user.findFirst({
         where: {
-          phone: data.phone.trim(),
+          mobileNumber: data.phone.trim(),
           id: { not: userId }
         }
       });
@@ -273,26 +344,34 @@ export class AdminService {
       }
     }
 
+    const nameData: { firstName?: string; lastName?: string } = {};
+    if (data.fullName?.trim()) {
+      const parts = data.fullName.trim().split(/\s+/);
+      nameData.firstName = parts[0];
+      nameData.lastName = parts.slice(1).join(' ') || user.lastName;
+    }
+
     const updated = await prisma.user.update({
       where: { id: userId },
       data: {
-        ...(data.fullName ? { fullName: data.fullName.trim() } : {}),
-        ...(data.email ? { email: data.email.toLowerCase().trim() } : {}),
-        ...(data.phone ? { phone: data.phone.trim() } : {}),
+        ...nameData,
+        ...(data.email ? { emailAddress: data.email.toLowerCase().trim() } : {}),
+        ...(data.phone ? { mobileNumber: data.phone.trim() } : {}),
         ...(typeof data.isActive === 'boolean' ? { isActive: data.isActive } : {})
       },
       select: {
         id: true,
-        fullName: true,
-        email: true,
-        phone: true,
+        firstName: true,
+        lastName: true,
+        emailAddress: true,
+        mobileNumber: true,
         role: true,
         isActive: true,
         createdAt: true
       }
     });
 
-    return updated;
+    return mapStaffRow(updated);
   }
 
   async resetStaffPassword(userId: string, newPassword: string) {
@@ -306,16 +385,21 @@ export class AdminService {
     const passwordHash = await hashPassword(newPassword);
     await prisma.user.update({
       where: { id: userId },
-      data: { passwordHash }
+      data: { password: passwordHash }
     });
 
-    return { id: user.id, email: user.email, fullName: user.fullName, updated: true };
+    return {
+      id: user.id,
+      email: user.emailAddress,
+      fullName: formatFullName(user.firstName, user.lastName),
+      updated: true
+    };
   }
 
   async resetPartnerPassword(partnerId: string, newPassword: string) {
-    const partner = await prisma.partner.findUnique({ where: { id: partnerId } });
-    if (!partner) throw new AppError('Partner not found', 404, 'NOT_FOUND');
-    if (!partner.userId) throw new AppError('No login user account associated with this partner', 400, 'NO_USER');
+    const partner = await prisma.affiliate.findUnique({ where: { id: partnerId } });
+    if (!partner) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
+    if (!partner.userId) throw new AppError('No login user account associated with this affiliate', 400, 'NO_USER');
     return this.resetStaffPassword(partner.userId, newPassword);
   }
 
@@ -323,98 +407,32 @@ export class AdminService {
   // PARTNER MANAGEMENT
   // ============================================================================
 
-  async listPartners(status?: PartnerStatus, category?: PartnerCategory, search?: string, city?: string, page = 1, limit = 20) {
-    // 0. Auto-sync any onboarded premises that do not have a partner record yet
-    try {
-      const unlinkedOnboardedPremises = await prisma.premises.findMany({
-        where: {
-          currentStatus: PremisesStatus.PARTNER_ONBOARDED,
-          partner: null
-        },
-        include: { visits: { orderBy: { createdAt: 'desc' }, take: 1 } }
-      });
-
-      for (const p of unlinkedOnboardedPremises) {
-        const rawPhone = p.contactNumber.replace(/\D/g, '');
-        const normalizedMobile = p.contactNumber.startsWith('+91')
-          ? p.contactNumber
-          : `+91${rawPhone}`;
-        const email = `${rawPhone || p.id.slice(0, 8)}@partner.iotaacademy.in`;
-
-        let user = await prisma.user.findFirst({
-          where: { OR: [{ email }, { phone: normalizedMobile }] }
-        });
-
-        if (!user) {
-          const defaultPasswordHash = await hashPassword('Partner@123456');
-          user = await prisma.user.create({
-            data: {
-              email,
-              phone: normalizedMobile,
-              fullName: p.premisesName,
-              passwordHash: defaultPasswordHash,
-              role: Role.PARTNER,
-              isActive: false
-            }
-          });
-        }
-
-        const partnerCode = await generateUniqueAffiliateCode();
-        const frontendBase = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
-        const registrationUrl = `${frontendBase}/register/${partnerCode}`;
-        const salespersonId = p.visits?.[0]?.salespersonId || p.assignedSalesId || null;
-
-        await prisma.partner.create({
-          data: {
-            userId: user.id,
-            premisesId: p.id,
-            partnerCode,
-            businessName: p.premisesName,
-            category: p.category,
-            ownerName: p.premisesName,
-            contactPerson: p.premisesName,
-            mobile: normalizedMobile,
-            email,
-            addressLine1: p.fullAddress,
-            addressLine2: null,
-            city: 'General',
-            area: 'General',
-            pincode: '560001',
-            latitude: p.latitude,
-            longitude: p.longitude,
-            registrationUrl,
-            status: PartnerStatus.PENDING_APPROVAL,
-            onboardedByUserId: salespersonId
-          }
-        });
-      }
-    } catch (syncErr) {
-      console.warn('Failed to auto-sync unlinked onboarded premises to partners:', syncErr);
-    }
-
+  async listPartners(status?: AffiliateStatus, _category?: PartnerCategory, search?: string, city?: string, page = 1, limit = 20) {
     const where: any = { deletedAt: null };
 
     if (status) where.status = status;
-    if (category) where.category = category;
     if (city) where.city = { equals: city, mode: 'insensitive' };
 
     if (search) {
       where.OR = [
-        { businessName: { contains: search, mode: 'insensitive' } },
-        { partnerCode: { contains: search, mode: 'insensitive' } },
-        { ownerName: { contains: search, mode: 'insensitive' } },
-        { mobile: { contains: search } },
-        { email: { contains: search, mode: 'insensitive' } }
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { firmName: { contains: search, mode: 'insensitive' } },
+        { affiliateCode: { contains: search, mode: 'insensitive' } },
+        { mobileNumber: { contains: search } },
+        { emailAddress: { contains: search, mode: 'insensitive' } },
+        { city: { contains: search, mode: 'insensitive' } },
+        { state: { contains: search, mode: 'insensitive' } },
+        { otherOccupationName: { contains: search, mode: 'insensitive' } }
       ];
     }
 
     const [total, partners] = await Promise.all([
-      prisma.partner.count({ where }),
-      prisma.partner.findMany({
+      prisma.affiliate.count({ where }),
+      prisma.affiliate.findMany({
         where,
         include: {
-          user: { select: { fullName: true, email: true, isActive: true } },
-          premises: { select: { id: true, premisesName: true, fullAddress: true } },
+          user: { select: { firstName: true, lastName: true, emailAddress: true, mobileNumber: true, isActive: true } },
           _count: {
             select: {
               leads: true,
@@ -430,46 +448,42 @@ export class AdminService {
     ]);
 
     return {
-      partners,
+      partners: partners.map(mapAffiliateRow),
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) }
     };
   }
 
   async getPartnerDetails(partnerId: string) {
-    const partner = await prisma.partner.findUnique({
+    const partner = await prisma.affiliate.findUnique({
       where: { id: partnerId },
       include: {
-        user: { select: { id: true, fullName: true, email: true, phone: true, isActive: true } },
-        premises: true,
+        user: { select: { id: true, firstName: true, lastName: true, emailAddress: true, mobileNumber: true, isActive: true } },
         documents: true,
         _count: { select: { leads: true, commissions: true } }
       }
     });
 
     if (!partner) throw new AppError('Affiliate profile not found', 404, 'NOT_FOUND');
-    return partner;
+    return mapAffiliateRow(partner);
   }
 
-  async reviewPartner(partnerId: string, status: PartnerStatus, rejectionReason?: string) {
-    const partner = await prisma.partner.findUnique({
-      where: { id: partnerId },
-      include: { premises: true }
+  async reviewPartner(partnerId: string, status: AffiliateStatus, rejectionReason?: string) {
+    const partner = await prisma.affiliate.findUnique({
+      where: { id: partnerId }
     });
 
     if (!partner) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
 
-    if (status === PartnerStatus.ACTIVE) {
-      // Keep clean 6-char affiliate code; upgrade any legacy PTR/TEMP provisional codes
-      let partnerCode = partner.partnerCode;
-      if (isLegacyProvisionalCode(partnerCode)) {
-        partnerCode = await generateUniqueAffiliateCode();
+    if (status === AffiliateStatus.ACTIVE) {
+      let affiliateCode = partner.affiliateCode;
+      if (isLegacyProvisionalCode(affiliateCode)) {
+        affiliateCode = await generateUniqueAffiliateCode();
       }
 
       const frontendBase = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
-      const registrationUrl = `${frontendBase}/register/${partnerCode}`;
+      const registrationUrl = `${frontendBase}/register/${affiliateCode}`;
 
       const updated = await prisma.$transaction(async (tx) => {
-        // Activate user login account
         if (partner.userId) {
           await tx.user.update({
             where: { id: partner.userId },
@@ -477,47 +491,39 @@ export class AdminService {
           });
         }
 
-        const p = await tx.partner.update({
+        return tx.affiliate.update({
           where: { id: partnerId },
           data: {
-            status: PartnerStatus.ACTIVE,
-            partnerCode,
+            status: AffiliateStatus.ACTIVE,
+            affiliateCode,
             registrationUrl,
             approvedAt: new Date(),
             rejectionReason: null
           }
         });
-
-        // If converted from premises, mark premises as PARTNER_ONBOARDED
-        if (partner.premisesId) {
-          await tx.premises.update({
-            where: { id: partner.premisesId },
-            data: { currentStatus: PremisesStatus.PARTNER_ONBOARDED }
-          });
-        }
-
-        return p;
       });
 
-      return updated;
-    } else if (status === PartnerStatus.REJECTED) {
+      return mapAffiliateRow(updated);
+    } else if (status === AffiliateStatus.PROFILE_REJECTED || status === AffiliateStatus.KYC_REJECTED) {
       if (!rejectionReason) {
         throw new AppError('Rejection reason is required', 400, 'MISSING_REJECTION_REASON');
       }
 
-      return prisma.partner.update({
+      const updated = await prisma.affiliate.update({
         where: { id: partnerId },
         data: {
-          status: PartnerStatus.REJECTED,
+          status,
           rejectionReason
         }
       });
+      return mapAffiliateRow(updated);
     }
 
-    return prisma.partner.update({
+    const updated = await prisma.affiliate.update({
       where: { id: partnerId },
       data: { status }
     });
+    return mapAffiliateRow(updated);
   }
 
   // ============================================================================
@@ -543,11 +549,10 @@ export class AdminService {
       prisma.premises.findMany({
         where,
         include: {
-          partner: { select: { id: true, partnerCode: true, status: true } },
           visits: {
             orderBy: { createdAt: 'desc' },
             take: 1,
-            include: { salesperson: { select: { id: true, fullName: true, phone: true, email: true } } }
+            include: { salesperson: { select: { id: true, firstName: true, lastName: true, mobileNumber: true, emailAddress: true } } }
           },
           _count: { select: { visits: true } }
         },
@@ -558,7 +563,13 @@ export class AdminService {
     ]);
 
     return {
-      premises,
+      premises: premises.map((p) => ({
+        ...p,
+        visits: p.visits.map((v) => ({
+          ...v,
+          salesperson: v.salesperson ? mapStaffRow(v.salesperson) : undefined
+        }))
+      })),
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) }
     };
   }
@@ -712,7 +723,8 @@ export class AdminService {
         { premises: { premisesName: { contains: s, mode: 'insensitive' } } },
         { premises: { fullAddress: { contains: s, mode: 'insensitive' } } },
         { premises: { contactNumber: { contains: s } } },
-        { salesperson: { fullName: { contains: s, mode: 'insensitive' } } },
+        { salesperson: { firstName: { contains: s, mode: 'insensitive' } } },
+        { salesperson: { lastName: { contains: s, mode: 'insensitive' } } },
         { remarks: { contains: s, mode: 'insensitive' } }
       ];
     }
@@ -739,9 +751,10 @@ export class AdminService {
           salesperson: {
             select: {
               id: true,
-              fullName: true,
-              email: true,
-              phone: true
+              firstName: true,
+              lastName: true,
+              emailAddress: true,
+              mobileNumber: true
             }
           }
         },
@@ -776,7 +789,10 @@ export class AdminService {
     const [totalAll, assignedCount, inProgressCount, completedCount, geofenceCompliantCount] = statsAgg;
 
     return {
-      visits,
+      visits: visits.map((v) => ({
+        ...v,
+        salesperson: v.salesperson ? mapStaffRow(v.salesperson) : undefined
+      })),
       stats: {
         total: totalAll,
         assigned: assignedCount,
@@ -814,17 +830,17 @@ export class AdminService {
       prisma.lead.findMany({
         where,
         include: {
-          partner: { select: { id: true, partnerCode: true, businessName: true, category: true } },
+          partner: { select: { id: true, affiliateCode: true, firstName: true, lastName: true, firmName: true, occupation: true } },
           interestedCourse: { select: { id: true, name: true, feeAmount: true } },
           assignments: {
             where: { isCurrent: true },
-            include: { counsellor: { select: { id: true, fullName: true } } },
+            include: { counsellor: { select: { id: true, firstName: true, lastName: true } } },
             take: 1
           },
           activities: {
             take: 1,
             orderBy: { createdAt: 'desc' },
-            include: { user: { select: { id: true, fullName: true, role: true } } }
+            include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } }
           },
           admission: { select: { id: true, admissionCode: true, status: true } }
         },
@@ -835,7 +851,18 @@ export class AdminService {
     ]);
 
     return {
-      leads,
+      leads: leads.map((l) => ({
+        ...l,
+        partner: l.partner ? { id: l.partner.id, partnerCode: l.partner.affiliateCode, businessName: formatAffiliateBusinessName(l.partner) } : null,
+        assignments: l.assignments.map((a) => ({
+          ...a,
+          counsellor: a.counsellor ? { id: a.counsellor.id, fullName: formatFullName(a.counsellor.firstName, a.counsellor.lastName) } : undefined
+        })),
+        activities: l.activities.map((act) => ({
+          ...act,
+          user: act.user ? { id: act.user.id, fullName: formatFullName(act.user.firstName, act.user.lastName), role: act.user.role } : undefined
+        }))
+      })),
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) }
     };
   }
@@ -884,7 +911,7 @@ export class AdminService {
           activityType: LeadActivityType.COUNSELLOR_REASSIGNED,
           previousStatus: lead.status,
           newStatus: lead.status,
-          remarks: remarks || `Reassigned to Counselor ${counsellor.fullName} by Administrator`
+          remarks: remarks || `Reassigned to Counselor ${formatFullName(counsellor.firstName, counsellor.lastName)} by Administrator`
         }
       });
 

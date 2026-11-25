@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PartnerCategory, PartnerStatus, PremisesStatus, Role } from '../shared';
+import { PartnerCategory, AffiliateStatus, PremisesStatus, Role } from '../shared';
 
 // Create Counselor or Sales User
 export const createStaffSchema = z.object({
@@ -32,18 +32,29 @@ export const resetStaffPasswordSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters').trim()
 });
 
-// Partner Approval / Rejection
+// Affiliate Approval / Rejection
 export const partnerApprovalSchema = z.object({
-  status: z.enum([PartnerStatus.ACTIVE, PartnerStatus.REJECTED, PartnerStatus.SUSPENDED]),
+  status: z.enum([
+    AffiliateStatus.ACTIVE,
+    AffiliateStatus.PROFILE_REJECTED,
+    AffiliateStatus.KYC_PENDING,
+    AffiliateStatus.KYC_REJECTED,
+    AffiliateStatus.KYC_REVISED,
+    AffiliateStatus.SUSPENDED,
+    AffiliateStatus.INACTIVE
+  ]),
   rejectionReason: z.string().optional()
 }).refine(
   (data) => {
-    if (data.status === PartnerStatus.REJECTED && !data.rejectionReason) {
+    if (
+      (data.status === AffiliateStatus.PROFILE_REJECTED || data.status === AffiliateStatus.KYC_REJECTED) &&
+      !data.rejectionReason
+    ) {
       return false;
     }
     return true;
   },
-  { message: 'Rejection reason is mandatory when rejecting a partner registration', path: ['rejectionReason'] }
+  { message: 'Rejection reason is mandatory when rejecting an affiliate application', path: ['rejectionReason'] }
 );
 
 // Premises Schema

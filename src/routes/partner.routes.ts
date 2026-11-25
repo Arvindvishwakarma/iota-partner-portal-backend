@@ -8,8 +8,8 @@ import { requestWithdrawalSchema } from '../validators/settlement.validator';
 
 const router = Router();
 
-// Partner Role Guard
-router.use(authenticateJwt, requireRole([Role.PARTNER]));
+// Affiliate / Partner Role Guard
+router.use(authenticateJwt, requireRole([Role.AFFILIATE, Role.PARTNER]));
 
 router.get('/dashboard', partnerController.getDashboard.bind(partnerController));
 router.get('/leads', partnerController.getLeads.bind(partnerController));

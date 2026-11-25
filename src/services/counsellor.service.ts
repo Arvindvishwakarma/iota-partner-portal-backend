@@ -13,6 +13,19 @@ import {
   LogActivityInput,
   UpdateLeadStatusInput
 } from '../validators/counsellor.validator';
+import { formatAffiliateBusinessName, formatFullName } from '../utils/user-display';
+
+function mapLeadPartner(p: any) {
+  if (!p) return null;
+  return {
+    id: p.id,
+    partnerCode: p.affiliateCode,
+    businessName: formatAffiliateBusinessName(p),
+    ownerName: formatFullName(p.firstName, p.lastName),
+    city: p.city,
+    mobile: p.mobileNumber
+  };
+}
 
 export class CounsellorService {
   /**
@@ -89,7 +102,7 @@ export class CounsellorService {
           city: true,
           createdAt: true,
           interestedCourse: { select: { id: true, name: true } },
-          partner: { select: { id: true, partnerCode: true, businessName: true, ownerName: true } },
+          partner: { select: { id: true, affiliateCode: true, firstName: true, lastName: true, firmName: true, occupation: true } },
           activities: {
             where: { scheduledFor: { not: null } },
             orderBy: { scheduledFor: 'asc' },
@@ -112,7 +125,10 @@ export class CounsellorService {
         scheduledFollowupsToday,
         overdueFollowups
       },
-      priorityFollowups
+      priorityFollowups: priorityFollowups.map((l) => ({
+        ...l,
+        partner: mapLeadPartner(l.partner)
+      }))
     };
   }
 
@@ -166,9 +182,11 @@ export class CounsellorService {
           partner: {
             select: {
               id: true,
-              partnerCode: true,
-              businessName: true,
-              ownerName: true
+              affiliateCode: true,
+              firstName: true,
+              lastName: true,
+              firmName: true,
+              occupation: true
             }
           },
           interestedCourse: {
@@ -207,7 +225,7 @@ export class CounsellorService {
     ]);
 
     return {
-      leads,
+      leads: leads.map((l) => ({ ...l, partner: mapLeadPartner(l.partner) })),
       meta: {
         total,
         page,
@@ -229,11 +247,13 @@ export class CounsellorService {
         partner: {
           select: {
             id: true,
-            partnerCode: true,
-            businessName: true,
-            ownerName: true,
+            affiliateCode: true,
+            firstName: true,
+            lastName: true,
+            firmName: true,
+            occupation: true,
             city: true,
-            mobile: true
+            mobileNumber: true
           }
         },
         interestedCourse: true,
@@ -255,7 +275,8 @@ export class CounsellorService {
             user: {
               select: {
                 id: true,
-                fullName: true,
+                firstName: true,
+                lastName: true,
                 role: true
               }
             }
@@ -279,7 +300,14 @@ export class CounsellorService {
       );
     }
 
-    return lead;
+    return {
+      ...lead,
+      partner: mapLeadPartner(lead.partner),
+      activities: lead.activities.map((a) => ({
+        ...a,
+        user: a.user ? { id: a.user.id, fullName: formatFullName(a.user.firstName, a.user.lastName), role: a.user.role } : undefined
+      }))
+    };
   }
 
   /**
@@ -301,7 +329,7 @@ export class CounsellorService {
           newStatus: lead.status
         },
         include: {
-          user: { select: { fullName: true, role: true } }
+          user: { select: { firstName: true, lastName: true, role: true } }
         }
       });
 
@@ -640,22 +668,27 @@ export class CounsellorService {
             status: true,
             city: true,
             interestedCourse: { select: { name: true } },
-            partner: { select: { partnerCode: true, businessName: true } }
+            partner: { select: { affiliateCode: true, firstName: true, lastName: true, firmName: true, occupation: true } }
           }
         }
       },
       orderBy: { scheduledFor: 'asc' }
     });
 
-    const overdue = scheduledActivities.filter(
+    const mappedFollowups = scheduledActivities.map((a) => ({
+      ...a,
+      lead: { ...a.lead, partner: mapLeadPartner(a.lead.partner) }
+    }));
+
+    const overdue = mappedFollowups.filter(
       (a) => a.scheduledFor && new Date(a.scheduledFor) < todayStart
     );
 
-    const today = scheduledActivities.filter(
+    const today = mappedFollowups.filter(
       (a) => a.scheduledFor && new Date(a.scheduledFor) >= todayStart && new Date(a.scheduledFor) <= todayEnd
     );
 
-    const upcoming = scheduledActivities.filter(
+    const upcoming = mappedFollowups.filter(
       (a) => a.scheduledFor && new Date(a.scheduledFor) > todayEnd
     );
 
@@ -696,14 +729,18 @@ export class CounsellorService {
         },
         user: {
           select: {
-            fullName: true,
+            firstName: true,
+            lastName: true,
             role: true
           }
         }
       }
     });
 
-    return activities;
+    return activities.map((a) => ({
+      ...a,
+      user: a.user ? { fullName: formatFullName(a.user.firstName, a.user.lastName), role: a.user.role } : undefined
+    }));
   }
 
   /**

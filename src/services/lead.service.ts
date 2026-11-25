@@ -5,63 +5,90 @@ import {
   LeadStatus,
   LeadSource,
   LeadActivityType,
-  PartnerStatus,
+  AffiliateStatus,
   Role,
   NotificationChannel,
   NotificationStatus
 } from '../shared';
 import { logger } from '../config/logger';
 import { toCapitalCase } from '../validators/public-lead.validator';
+import { formatAffiliateBusinessName } from '../utils/user-display';
 
 export class LeadService {
   /**
-   * Public check: verify that a partner code exists and is actively authorized
+   * Public check: verify that an affiliate code exists and is actively authorized
    */
   async verifyPartnerCode(partnerCode: string) {
-    const cleanedCode = (partnerCode || '').trim().toUpperCase();
-    let partner = await prisma.partner.findFirst({
-      where: {
-        OR: [
-          { partnerCode: cleanedCode },
-          { partnerCode: { equals: partnerCode.trim(), mode: 'insensitive' } }
-        ]
-      },
-      select: {
-        id: true,
-        partnerCode: true,
-        businessName: true,
-        category: true,
-        city: true,
-        area: true,
-        status: true
-      }
-    });
-
-    if (!partner) {
-      // Fallback to active partner for preview or default test codes
-      partner = await prisma.partner.findFirst({
-        where: { status: PartnerStatus.ACTIVE },
-        select: {
-          id: true,
-          partnerCode: true,
-          businessName: true,
-          category: true,
-          city: true,
-          area: true,
-          status: true
-        }
-      });
-    }
-
-    if (!partner || partner.status === PartnerStatus.REJECTED || partner.status === PartnerStatus.SUSPENDED) {
+    const rawCode = (partnerCode || '').trim();
+    if (!rawCode) {
       throw new AppError(
-        'The referral link is invalid, expired, or the partner center is currently inactive.',
+        'Invalid referral link. No affiliate code was provided.',
         404,
         'INVALID_PARTNER_CODE'
       );
     }
 
-    return partner;
+    const cleanedCode = rawCode.toUpperCase();
+    const affiliate = await prisma.affiliate.findFirst({
+      where: {
+        deletedAt: null,
+        OR: [
+          { affiliateCode: cleanedCode },
+          { affiliateCode: { equals: rawCode, mode: 'insensitive' } }
+        ]
+      },
+      select: {
+        id: true,
+        affiliateCode: true,
+        firstName: true,
+        lastName: true,
+        firmName: true,
+        occupation: true,
+        city: true,
+        state: true,
+        status: true,
+        user: {
+          select: {
+            isActive: true,
+            deletedAt: true
+          }
+        }
+      }
+    });
+
+    if (!affiliate) {
+      throw new AppError(
+        'The referral link is invalid or does not match any registered affiliate.',
+        404,
+        'INVALID_PARTNER_CODE'
+      );
+    }
+
+    if (affiliate.status === AffiliateStatus.PENDING_APPROVAL) {
+      throw new AppError(
+        'This affiliate account is currently pending approval. Student registrations are paused until the affiliate is verified and activated.',
+        403,
+        'PARTNER_PENDING_APPROVAL'
+      );
+    }
+
+    if (affiliate.status !== AffiliateStatus.ACTIVE || !affiliate.user?.isActive || affiliate.user?.deletedAt) {
+      throw new AppError(
+        'This affiliate account is currently inactive or suspended and cannot accept student registrations.',
+        403,
+        'PARTNER_INACTIVE'
+      );
+    }
+
+    return {
+      id: affiliate.id,
+      partnerCode: affiliate.affiliateCode,
+      affiliateCode: affiliate.affiliateCode,
+      businessName: formatAffiliateBusinessName(affiliate),
+      city: affiliate.city,
+      area: affiliate.state,
+      status: affiliate.status
+    };
   }
 
   /**
@@ -109,14 +136,15 @@ export class LeadService {
         createdAt: { gte: attributionThreshold }
       },
       include: {
-        partner: { select: { id: true, partnerCode: true, businessName: true } }
+        partner: { select: { id: true, affiliateCode: true, firstName: true, lastName: true, firmName: true, occupation: true } }
       }
     });
 
     // Handle Duplicate Submissions within 60-day Window (Rule BR-LED-02)
     if (existingLead) {
+      const existingPartnerBusiness = existingLead.partner ? formatAffiliateBusinessName(existingLead.partner) : 'ORGANIC';
       logger.info(
-        `Duplicate enquiry detected for ${data.mobile}. Original Partner: ${existingLead.partner?.partnerCode || 'ORGANIC'}. Attempted Partner: ${partner.partnerCode}. Preserving original attribution.`
+        `Duplicate enquiry detected for ${data.mobile}. Original Partner: ${existingLead.partner?.affiliateCode || 'ORGANIC'}. Attempted Partner: ${partner.partnerCode}. Preserving original attribution.`
       );
 
       // Audit duplicate attempt in duplicate_lead_submissions
@@ -145,7 +173,7 @@ export class LeadService {
         leadCode: existingLead.leadCode,
         studentName: data.studentName,
         isExistingLead: true,
-        partnerBusinessName: existingLead.partner?.businessName || partner.businessName,
+        partnerBusinessName: existingLead.partner ? existingPartnerBusiness : partner.businessName,
         message: 'Your enquiry has been successfully received! An academic counselor will connect with you shortly.'
       };
     }

@@ -3,6 +3,7 @@ import { logger } from '../config/logger';
 import { AppError } from '../middlewares/error.middleware';
 import { NotificationChannel, NotificationStatus } from '../shared';
 import { QueryNotificationsInput, SendNotificationInput } from '../validators/notification.validator';
+import { formatFullName } from '../utils/user-display';
 
 export interface WhatsAppTemplatePayload {
   messagingProduct: 'whatsapp';
@@ -143,11 +144,11 @@ export class NotificationService {
     if (resolvedUserId && (!resolvedPhone || !resolvedEmail)) {
       const user = await prisma.user.findUnique({
         where: { id: resolvedUserId },
-        select: { id: true, phone: true, email: true, fullName: true }
+        select: { id: true, mobileNumber: true, emailAddress: true, firstName: true, lastName: true }
       });
       if (user) {
-        if (!resolvedPhone) resolvedPhone = user.phone;
-        if (!resolvedEmail) resolvedEmail = user.email;
+        if (!resolvedPhone) resolvedPhone = user.mobileNumber;
+        if (!resolvedEmail) resolvedEmail = user.emailAddress;
       }
     }
 
@@ -354,7 +355,7 @@ export class NotificationService {
         where,
         include: {
           user: {
-            select: { id: true, fullName: true, email: true, phone: true, role: true }
+            select: { id: true, firstName: true, lastName: true, emailAddress: true, mobileNumber: true, role: true }
           }
         },
         orderBy: { createdAt: 'desc' },
@@ -364,7 +365,18 @@ export class NotificationService {
     ]);
 
     return {
-      logs,
+      logs: logs.map((l) => ({
+        ...l,
+        user: l.user
+          ? {
+              id: l.user.id,
+              fullName: formatFullName(l.user.firstName, l.user.lastName),
+              email: l.user.emailAddress,
+              phone: l.user.mobileNumber,
+              role: l.user.role
+            }
+          : undefined
+      })),
       meta: {
         total,
         page,
@@ -394,8 +406,8 @@ export class NotificationService {
       title: notif.title,
       message: notif.message,
       actionUrl: notif.actionUrl,
-      phone: notif.user?.phone,
-      email: notif.user?.email,
+      phone: notif.user?.mobileNumber,
+      email: notif.user?.emailAddress,
       metadata: { ...((notif.metadata as any) || {}), retriedAt: new Date().toISOString() }
     });
   }

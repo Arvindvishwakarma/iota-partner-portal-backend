@@ -9,10 +9,9 @@ import {
   LeadStatus,
   SettlementStatus,
   TicketPriority,
-  PartnerStatus,
+  AffiliateStatus,
   Role,
   STUDENT_REFUND_WINDOW_DAYS,
-  AuthenticatedUser,
   JwtUserPayload
 } from '../shared';
 import { env } from '../config/environment';
@@ -20,11 +19,16 @@ import { hashPassword } from '../utils/password';
 import { generateAccessToken } from '../utils/jwt';
 import {
   PublicPartnerRegisterInput,
-  mapCategoryToEnum,
-  isIndividualOccupation,
   toCapitalCase
 } from '../validators/public-partner.validator';
 import { generateUniqueAffiliateCode } from '../utils/affiliate-code';
+import {
+  buildAuthenticatedUser,
+  formatAffiliateBusinessName,
+  formatFullName,
+  formatOccupationLabel,
+  toPrismaOccupation
+} from '../utils/user-display';
 import { RequestWithdrawalInput } from '../validators/settlement.validator';
 import { whatsappOtpService } from './whatsapp-otp.service';
 import { emailOtpService } from './email-otp.service';
@@ -34,53 +38,60 @@ export class PartnerService {
    * Fetch Partner Dashboard Overview Metrics
    */
   async getDashboard(partnerId: string) {
-    const partner = await prisma.partner.findUnique({
+    const affiliate = await prisma.affiliate.findUnique({
       where: { id: partnerId },
       select: {
         id: true,
-        partnerCode: true,
-        businessName: true,
-        ownerName: true,
-        contactPerson: true,
-        category: true,
-        mobile: true,
-        whatsapp: true,
-        email: true,
+        affiliateCode: true,
+        firstName: true,
+        lastName: true,
+        firmName: true,
+        occupation: true,
+        mobileNumber: true,
+        whatsappNumber: true,
+        emailAddress: true,
         status: true,
         city: true,
-        addressLine1: true,
+        state: true,
+        communicationAddress: true,
         registrationUrl: true,
         rejectionReason: true,
         createdAt: true,
-        bankAccountName: true,
+        bankAccountHolderName: true,
         bankAccountNumber: true,
-        bankIfsc: true,
-        bankName: true,
-        upiId: true
+        bankIfscNumber: true,
+        bankName: true
       }
     });
 
-    if (!partner) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
+    if (!affiliate) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
 
-    // If partner is not ACTIVE (e.g. PENDING_APPROVAL, REJECTED, SUSPENDED), restrict access to dashboard, referral link, QR code and features
-    if (partner.status !== PartnerStatus.ACTIVE) {
+    const ownerName = formatFullName(affiliate.firstName, affiliate.lastName);
+    const businessName = formatAffiliateBusinessName(affiliate);
+    const occupationLabel = formatOccupationLabel(affiliate.occupation);
+
+    // If affiliate is not ACTIVE, restrict access to dashboard, referral link, QR code and features
+    if (affiliate.status !== AffiliateStatus.ACTIVE) {
       return {
         partner: {
-          id: partner.id,
-          partnerCode: partner.partnerCode,
-          businessName: partner.businessName,
-          ownerName: partner.ownerName,
-          contactPerson: partner.contactPerson,
-          category: partner.category,
-          mobile: partner.mobile,
-          whatsapp: partner.whatsapp,
-          email: partner.email,
-          city: partner.city,
-          addressLine1: partner.addressLine1,
-          status: partner.status,
+          id: affiliate.id,
+          partnerCode: affiliate.affiliateCode,
+          affiliateCode: affiliate.affiliateCode,
+          businessName,
+          ownerName,
+          firstName: affiliate.firstName,
+          lastName: affiliate.lastName,
+          contactPerson: occupationLabel,
+          mobile: affiliate.mobileNumber,
+          whatsapp: affiliate.whatsappNumber,
+          email: affiliate.emailAddress,
+          city: affiliate.city,
+          state: affiliate.state,
+          addressLine1: affiliate.communicationAddress,
+          status: affiliate.status,
           registrationUrl: '', // Hide referral link until approved
-          rejectionReason: partner.rejectionReason,
-          createdAt: partner.createdAt
+          rejectionReason: affiliate.rejectionReason,
+          createdAt: affiliate.createdAt
         },
         metrics: {
           totalStudentsReferred: 0,
@@ -121,7 +132,7 @@ export class PartnerService {
     });
 
     const baseUrl = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
-    const liveRegistrationUrl = `${baseUrl}/register/${partner.partnerCode}`;
+    const liveRegistrationUrl = `${baseUrl}/register/${affiliate.affiliateCode}`;
 
     const [
       totalStudentsReferred,
@@ -266,7 +277,26 @@ export class PartnerService {
 
     return {
       partner: {
-        ...partner,
+        id: affiliate.id,
+        partnerCode: affiliate.affiliateCode,
+        affiliateCode: affiliate.affiliateCode,
+        businessName,
+        ownerName,
+        firstName: affiliate.firstName,
+        lastName: affiliate.lastName,
+        contactPerson: occupationLabel,
+        mobile: affiliate.mobileNumber,
+        whatsapp: affiliate.whatsappNumber,
+        email: affiliate.emailAddress,
+        city: affiliate.city,
+        state: affiliate.state,
+        addressLine1: affiliate.communicationAddress,
+        status: affiliate.status,
+        bankAccountName: affiliate.bankAccountHolderName,
+        bankAccountNumber: affiliate.bankAccountNumber,
+        bankIfsc: affiliate.bankIfscNumber,
+        bankName: affiliate.bankName,
+        createdAt: affiliate.createdAt,
         registrationUrl: liveRegistrationUrl,
         qrPngDataUrl,
         qrSvgString
@@ -293,13 +323,13 @@ export class PartnerService {
    * Partner Requests Commission Withdrawal
    */
   async requestWithdrawal(partnerId: string, input: RequestWithdrawalInput) {
-    const partner = await prisma.partner.findUnique({
+    const partner = await prisma.affiliate.findUnique({
       where: { id: partnerId }
     });
 
     if (!partner) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
 
-    if (partner.status !== PartnerStatus.ACTIVE) {
+    if (partner.status !== AffiliateStatus.ACTIVE) {
       throw new AppError('Only active approved affiliates can request payment withdrawals', 403, 'FORBIDDEN');
     }
 
@@ -319,28 +349,26 @@ export class PartnerService {
       );
     }
 
-    // Update partner bank or UPI details if provided
+    // Update affiliate bank details if provided
     const bankUpdates: any = {};
-    if (input.bankAccountName?.trim()) bankUpdates.bankAccountName = input.bankAccountName.trim();
+    if (input.bankAccountName?.trim()) bankUpdates.bankAccountHolderName = input.bankAccountName.trim();
     if (input.bankAccountNumber?.trim()) bankUpdates.bankAccountNumber = input.bankAccountNumber.trim();
-    if (input.bankIfsc?.trim()) bankUpdates.bankIfsc = input.bankIfsc.trim().toUpperCase();
+    if (input.bankIfsc?.trim()) bankUpdates.bankIfscNumber = input.bankIfsc.trim().toUpperCase();
     if (input.bankName?.trim()) bankUpdates.bankName = input.bankName.trim();
-    if (input.upiId?.trim()) bankUpdates.upiId = input.upiId.trim().toLowerCase();
 
     if (Object.keys(bankUpdates).length > 0) {
-      await prisma.partner.update({
+      await prisma.affiliate.update({
         where: { id: partnerId },
         data: bankUpdates
       });
     }
 
-    const currentPartner = await prisma.partner.findUnique({ where: { id: partnerId } });
-    const hasBank = !!(currentPartner?.bankAccountNumber && currentPartner?.bankIfsc);
-    const hasUpi = !!currentPartner?.upiId;
+    const currentPartner = await prisma.affiliate.findUnique({ where: { id: partnerId } });
+    const hasBank = !!(currentPartner?.bankAccountNumber && currentPartner?.bankIfscNumber);
 
-    if (!hasBank && !hasUpi) {
+    if (!hasBank) {
       throw new AppError(
-        'Please provide bank account details (Account Number & IFSC) or a valid UPI ID for payout transfer.',
+        'Please provide valid bank account details (Account Number & IFSC) for payout transfer.',
         400,
         'BANK_DETAILS_REQUIRED'
       );
@@ -434,6 +462,8 @@ export class PartnerService {
       return d < earliest ? d : earliest;
     }, new Date());
 
+    const partnerDisplayName = currentPartner ? formatAffiliateBusinessName(currentPartner) : 'Affiliate';
+
     const settlement = await prisma.$transaction(async (tx) => {
       const newSettlement = await tx.settlement.create({
         data: {
@@ -446,8 +476,8 @@ export class PartnerService {
           periodStartDate: earliestDate,
           periodEndDate: new Date(),
           notes: input.notes
-            ? `[Partner Withdrawal Request] ${input.notes}`
-            : `Withdrawal requested by ${currentPartner?.businessName} via partner dashboard.`
+            ? `[Affiliate Withdrawal Request] ${input.notes}`
+            : `Withdrawal requested by ${partnerDisplayName} via affiliate dashboard.`
         }
       });
 
@@ -470,7 +500,7 @@ export class PartnerService {
           data: {
             userId: admin.id,
             title: 'New Payment Withdrawal Request',
-            message: `${currentPartner?.businessName} (${currentPartner?.partnerCode}) requested a payment withdrawal of ₹${Number(totalAmount).toLocaleString('en-IN')}. Batch ${settlementCode} is awaiting admin approval.`,
+            message: `${partnerDisplayName} (${currentPartner?.affiliateCode}) requested a payment withdrawal of ₹${Number(totalAmount).toLocaleString('en-IN')}. Batch ${settlementCode} is awaiting admin approval.`,
             channel: 'IN_APP',
             actionUrl: '/admin/settlements'
           }
@@ -486,8 +516,8 @@ export class PartnerService {
           newValues: {
             settlementCode,
             partnerId,
-            partnerCode: currentPartner?.partnerCode,
-            businessName: currentPartner?.businessName,
+            partnerCode: currentPartner?.affiliateCode,
+            businessName: partnerDisplayName,
             netPaidAmount: totalAmount.toString(),
             commissionsCount: eligibleCommissions.length,
             notes: input.notes
@@ -505,9 +535,9 @@ export class PartnerService {
    * List Attributed Leads for Partner (Read-Only Statuses)
    */
   async getLeads(partnerId: string, status?: LeadStatus, search?: string, page = 1, limit = 20) {
-    const partner = await prisma.partner.findUnique({ where: { id: partnerId }, select: { status: true } });
-    if (!partner) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
-    if (partner.status !== PartnerStatus.ACTIVE) {
+    const affiliate = await prisma.affiliate.findUnique({ where: { id: partnerId }, select: { status: true } });
+    if (!affiliate) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
+    if (affiliate.status !== AffiliateStatus.ACTIVE) {
       throw new AppError('Leads tracker is restricted while your registration is pending approval.', 403, 'ACCOUNT_RESTRICTED');
     }
 
@@ -557,9 +587,9 @@ export class PartnerService {
    * Commission Ledger for Partner
    */
   async getCommissions(partnerId: string, page = 1, limit = 20) {
-    const partner = await prisma.partner.findUnique({ where: { id: partnerId }, select: { status: true } });
-    if (!partner) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
-    if (partner.status !== PartnerStatus.ACTIVE) {
+    const affiliate = await prisma.affiliate.findUnique({ where: { id: partnerId }, select: { status: true } });
+    if (!affiliate) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
+    if (affiliate.status !== AffiliateStatus.ACTIVE) {
       throw new AppError('Commission earnings are restricted while your registration is pending approval.', 403, 'ACCOUNT_RESTRICTED');
     }
 
@@ -602,9 +632,9 @@ export class PartnerService {
    * Settlement Payout History for Partner
    */
   async getSettlements(partnerId: string, page = 1, limit = 20) {
-    const partner = await prisma.partner.findUnique({ where: { id: partnerId }, select: { status: true } });
-    if (!partner) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
-    if (partner.status !== PartnerStatus.ACTIVE) {
+    const affiliate = await prisma.affiliate.findUnique({ where: { id: partnerId }, select: { status: true } });
+    if (!affiliate) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
+    if (affiliate.status !== AffiliateStatus.ACTIVE) {
       throw new AppError('Settlement history is restricted while your registration is pending approval.', 403, 'ACCOUNT_RESTRICTED');
     }
 
@@ -650,85 +680,84 @@ export class PartnerService {
   }
 
   /**
-   * Public Partner Self-Registration from Landing Page
+   * Public Affiliate Self-Registration from /join or Modal
    */
   async registerPublicPartner(data: PublicPartnerRegisterInput) {
-    const rawFullName = (data.fullName || `${data.firstName || ''} ${data.lastName || ''}`).trim();
-    if (!rawFullName) {
-      throw new AppError('Full name is required', 400, 'INVALID_NAME');
+    const firstName = toCapitalCase(data.firstName);
+    const lastName = toCapitalCase(data.lastName);
+    const fullName = formatFullName(firstName, lastName);
+    if (!firstName || !lastName) {
+      throw new AppError('First name and last name are required', 400, 'INVALID_NAME');
     }
-    const fullName = toCapitalCase(rawFullName);
 
-    const cleanMobileDigits = data.phone.replace(/\D/g, '').slice(-10);
+    const cleanMobileDigits = data.mobileNumber.replace(/\D/g, '').slice(-10);
     const normalizedMobile = `+91${cleanMobileDigits}`;
 
-    const rawWhatsapp = (data.whatsapp && data.whatsapp.trim()) || data.phone;
-    const cleanWhatsappDigits = rawWhatsapp.replace(/\D/g, '').slice(-10);
+    const cleanWhatsappDigits = data.whatsappNumber.replace(/\D/g, '').slice(-10);
     const normalizedWhatsapp = `+91${cleanWhatsappDigits}`;
+    const emailLower = data.emailAddress.trim().toLowerCase();
+    const isTestOtpBypass = env.NODE_ENV !== 'production' && env.ALLOW_TEST_OTP_BYPASS;
 
-    // 0. Verify WhatsApp Number via OTP
-    const isWhatsappVerified = whatsappOtpService.isPhoneVerified(
-      cleanWhatsappDigits,
-      data.whatsappVerificationToken
-    );
-    if (!isWhatsappVerified) {
-      throw new AppError(
-        'WhatsApp number has not been verified. Please verify your WhatsApp number with the OTP before submitting.',
-        400,
-        'WHATSAPP_NOT_VERIFIED'
+    // 0. Verify WhatsApp Number via OTP (unless explicit non-production testing bypass is enabled)
+    if (!isTestOtpBypass) {
+      const isWhatsappVerified = whatsappOtpService.isPhoneVerified(
+        cleanWhatsappDigits,
+        data.whatsappVerificationToken
       );
-    }
+      if (!isWhatsappVerified) {
+        throw new AppError(
+          'WhatsApp number has not been verified. Please verify your WhatsApp number with the OTP before submitting.',
+          400,
+          'WHATSAPP_NOT_VERIFIED'
+        );
+      }
 
-    if (!data.email || !data.email.trim()) {
-      throw new AppError('Email address is required', 400, 'INVALID_EMAIL');
-    }
-    const emailLower = data.email.trim().toLowerCase();
-
-    // 0b. Verify Email Address via OTP
-    const isEmailVerified = emailOtpService.isEmailVerified(
-      emailLower,
-      data.emailVerificationToken
-    );
-    if (!isEmailVerified) {
-      throw new AppError(
-        'Email address has not been verified. Please verify your email with the OTP before submitting.',
-        400,
-        'EMAIL_NOT_VERIFIED'
+      // 0b. Verify Email Address via OTP
+      const isEmailVerified = emailOtpService.isEmailVerified(
+        emailLower,
+        data.emailVerificationToken
       );
+      if (!isEmailVerified) {
+        throw new AppError(
+          'Email address has not been verified. Please verify your email with the OTP before submitting.',
+          400,
+          'EMAIL_NOT_VERIFIED'
+        );
+      }
+    } else {
+      logger.info(`[Test OTP Bypass] Skipping WhatsApp & Email OTP verification for ${emailLower}`);
     }
 
-    const username = emailLower;
-    const userEmail = emailLower;
-    const partnerEmail = emailLower;
-
-    // 1. Check duplicate Phone Number in User (including soft-deleted to avoid DB unique constraint 500) and Partner records (mobile + whatsapp)
-    const [existingPhoneUser, existingPhonePartner] = await Promise.all([
+    // 1. Check duplicate Mobile Number across users and affiliates
+    const [existingPhoneUser, existingPhoneAffiliate] = await Promise.all([
       prisma.user.findFirst({
         where: {
           OR: [
-            { phone: cleanMobileDigits },
-            { phone: normalizedMobile },
-            { phone: { endsWith: cleanMobileDigits } },
-            { email: cleanMobileDigits }
+            { mobileNumber: cleanMobileDigits },
+            { mobileNumber: normalizedMobile },
+            { mobileNumber: { endsWith: cleanMobileDigits } },
+            { whatsappNumber: cleanMobileDigits },
+            { whatsappNumber: normalizedWhatsapp },
+            { emailAddress: cleanMobileDigits }
           ]
         }
       }),
-      prisma.partner.findFirst({
+      prisma.affiliate.findFirst({
         where: {
           OR: [
-            { mobile: cleanMobileDigits },
-            { mobile: normalizedMobile },
-            { mobile: { endsWith: cleanMobileDigits } },
-            { whatsapp: cleanMobileDigits },
-            { whatsapp: normalizedWhatsapp },
-            { whatsapp: { endsWith: cleanMobileDigits } }
+            { mobileNumber: cleanMobileDigits },
+            { mobileNumber: normalizedMobile },
+            { mobileNumber: { endsWith: cleanMobileDigits } },
+            { whatsappNumber: cleanMobileDigits },
+            { whatsappNumber: normalizedWhatsapp },
+            { whatsappNumber: { endsWith: cleanMobileDigits } }
           ],
           deletedAt: null
         }
       })
     ]);
 
-    if (existingPhoneUser || existingPhonePartner) {
+    if (existingPhoneUser || existingPhoneAffiliate) {
       throw new AppError(
         `An affiliate account with Mobile Number '${cleanMobileDigits}' already exists. Please login to your dashboard or contact support.`,
         409,
@@ -736,18 +765,18 @@ export class PartnerService {
       );
     }
 
-    // 2. Check duplicate WhatsApp Number (only needed when different from Mobile Number)
+    // 2. Check duplicate WhatsApp Number (when different from Mobile Number)
     if (cleanWhatsappDigits !== cleanMobileDigits) {
-      const [existingWhatsappPartner, existingWhatsappUser] = await Promise.all([
-        prisma.partner.findFirst({
+      const [existingWhatsappAffiliate, existingWhatsappUser] = await Promise.all([
+        prisma.affiliate.findFirst({
           where: {
             OR: [
-              { whatsapp: cleanWhatsappDigits },
-              { whatsapp: normalizedWhatsapp },
-              { whatsapp: { endsWith: cleanWhatsappDigits } },
-              { mobile: cleanWhatsappDigits },
-              { mobile: normalizedWhatsapp },
-              { mobile: { endsWith: cleanWhatsappDigits } }
+              { whatsappNumber: cleanWhatsappDigits },
+              { whatsappNumber: normalizedWhatsapp },
+              { whatsappNumber: { endsWith: cleanWhatsappDigits } },
+              { mobileNumber: cleanWhatsappDigits },
+              { mobileNumber: normalizedMobile },
+              { mobileNumber: { endsWith: cleanWhatsappDigits } }
             ],
             deletedAt: null
           }
@@ -755,16 +784,16 @@ export class PartnerService {
         prisma.user.findFirst({
           where: {
             OR: [
-              { phone: cleanWhatsappDigits },
-              { phone: normalizedWhatsapp },
-              { phone: { endsWith: cleanWhatsappDigits } },
-              { email: cleanWhatsappDigits }
+              { mobileNumber: cleanWhatsappDigits },
+              { mobileNumber: normalizedWhatsapp },
+              { whatsappNumber: cleanWhatsappDigits },
+              { whatsappNumber: normalizedWhatsapp }
             ]
           }
         })
       ]);
 
-      if (existingWhatsappPartner || existingWhatsappUser) {
+      if (existingWhatsappAffiliate || existingWhatsappUser) {
         throw new AppError(
           `An affiliate account with WhatsApp Number '${cleanWhatsappDigits}' already exists. Please enter a different WhatsApp number.`,
           409,
@@ -773,17 +802,17 @@ export class PartnerService {
       }
     }
 
-    // 3. Check duplicate Email in User (including soft-deleted) and Partner records
-    const [existingEmailUser, existingEmailPartner] = await Promise.all([
+    // 3. Check duplicate Email in User (including soft-deleted) and Affiliate records
+    const [existingEmailUser, existingEmailAffiliate] = await Promise.all([
       prisma.user.findFirst({
-        where: { email: { equals: emailLower, mode: 'insensitive' } }
+        where: { emailAddress: { equals: emailLower, mode: 'insensitive' } }
       }),
-      prisma.partner.findFirst({
-        where: { email: { equals: emailLower, mode: 'insensitive' }, deletedAt: null }
+      prisma.affiliate.findFirst({
+        where: { emailAddress: { equals: emailLower, mode: 'insensitive' }, deletedAt: null }
       })
     ]);
 
-    if (existingEmailUser || existingEmailPartner) {
+    if (existingEmailUser || existingEmailAffiliate) {
       throw new AppError(
         `An affiliate account with Email '${emailLower}' already exists. Please Login or use a different email address.`,
         409,
@@ -791,121 +820,101 @@ export class PartnerService {
       );
     }
 
-    // 4. Hash chosen password for the affiliate's portal access
-    const passwordToHash = data.password || 'Partner@123456';
-    const passwordHash = await hashPassword(passwordToHash);
-
-    const chosenCategory = data.occupation?.trim() || data.category?.trim() || 'Student';
-    const isIndividual = isIndividualOccupation(chosenCategory);
-    const businessName = isIndividual
-      ? `${fullName} (${chosenCategory})`
-      : (data.businessName?.trim() || fullName);
-    const categoryEnum = mapCategoryToEnum(chosenCategory);
-
-    const displayCategory = data.otherBusiness?.trim()
-      ? `Other: ${data.otherBusiness.trim()}`
-      : chosenCategory;
-
-    // Build rich profile metadata for internal ops/admin review
-    const profileParts = [
-      `Occupation: ${displayCategory}`,
-      data.gender?.trim() ? `Gender: ${data.gender.trim()}` : null,
-      data.age ? `Age: ${data.age}` : null
-    ].filter(Boolean);
-    const contactPersonInfo = profileParts.join(' | ');
-
-    const notesParts = [
-      data.socialLink?.trim() ? `Social: ${data.socialLink.trim()}` : null,
-      data.notes?.trim() ? `Notes: ${data.notes.trim()}` : null
-    ].filter(Boolean);
-    const addressLine2 = notesParts.length ? notesParts.join(' | ') : null;
-
-    const addressLine1 = (data.address && data.address.trim())
-      ? data.address.trim()
-      : (isIndividual ? `Individual / Personal (${data.state.trim()})` : 'Not Provided');
+    // 4. Hash chosen password and prepare canonical enum/conditional fields
+    const passwordHash = await hashPassword(data.password);
+    const prismaOccupation = toPrismaOccupation(data.occupation);
+    const cleanLinks = (data.influencerLinks || []).map((l) => l.trim()).filter(Boolean);
+    const communicationAddress = data.communicationAddress.trim();
+    const city = toCapitalCase(data.city);
+    const state = data.state.trim();
+    const pincode = data.pincode.trim();
+    const bio = data.tellUsMoreAboutYourself?.trim() || null;
 
     const result = await prisma.$transaction(async (tx) => {
-      // Generate a unique 6-character alphanumeric affiliate code (e.g. "7K9M2X")
-      const partnerCode = await generateUniqueAffiliateCode(tx);
+      const affiliateCode = await generateUniqueAffiliateCode(tx);
 
-      // Create user login account (active immediately so affiliate can log in)
+      // Create user login account (active immediately so affiliate can view restricted pending screen)
       const user = await tx.user.create({
         data: {
-          email: userEmail,
-          phone: cleanMobileDigits,
-          fullName,
-          passwordHash,
-          role: Role.PARTNER,
+          firstName,
+          lastName,
+          role: Role.AFFILIATE as any,
+          gender: data.gender as any,
+          age: data.age,
+          mobileNumber: normalizedMobile,
+          whatsappNumber: normalizedWhatsapp,
+          emailAddress: emailLower,
+          password: passwordHash,
+          occupation: prismaOccupation,
+          communicationAddress,
           isActive: true
         }
       });
 
       const frontendBase = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
-      const registrationUrl = `${frontendBase}/register/${partnerCode}`;
+      const registrationUrl = `${frontendBase}/register/${affiliateCode}`;
 
-      // Create affiliate record with ACTIVE status
-      const partner = await tx.partner.create({
+      // Create affiliate record matching exact affiliates columns
+      const affiliate = await tx.affiliate.create({
         data: {
           userId: user.id,
-          partnerCode,
-          businessName,
-          category: categoryEnum,
-          ownerName: fullName,
-          contactPerson: contactPersonInfo, // Stores human-readable occupation, gender, age
-          mobile: cleanMobileDigits,
-          whatsapp: cleanWhatsappDigits,
-          email: partnerEmail,
-          addressLine1,
-          addressLine2, // Stores social profile links and custom notes
-          city: toCapitalCase((data.city && data.city.trim()) ? data.city.trim() : data.state.trim()),
-          area: '',
-          pincode: data.pincode.trim(),
+          affiliateCode,
           registrationUrl,
-          status: PartnerStatus.PENDING_APPROVAL
+          firstName,
+          lastName,
+          gender: data.gender as any,
+          age: data.age,
+          mobileNumber: normalizedMobile,
+          whatsappNumber: normalizedWhatsapp,
+          emailAddress: emailLower,
+          communicationAddress,
+          city,
+          state,
+          pincode,
+          tellUsMoreAboutYourself: bio,
+          occupation: prismaOccupation,
+          influencerLinks: prismaOccupation === 'INFLUENCER' && cleanLinks.length > 0 ? cleanLinks : undefined,
+          firmName: prismaOccupation === 'OTHER' ? data.firmName?.trim() || null : null,
+          specifyOccupation:
+            prismaOccupation === 'OTHER'
+              ? data.specifyOccupation?.trim() || data.otherOccupationName?.trim() || null
+              : null,
+          otherOccupationName:
+            prismaOccupation === 'OTHER'
+              ? data.otherOccupationName?.trim() || data.specifyOccupation?.trim() || null
+              : null,
+          otherOccupationDescribe: prismaOccupation === 'OTHER' ? data.otherOccupationDescribe?.trim() || null : null,
+          status: AffiliateStatus.PENDING_APPROVAL
         }
       });
 
-      return { partner, user };
+      return { affiliate, user };
     });
 
-    // Issue Access Token so the affiliate can access their account (restricted pending approval)
     const tokenPayload: JwtUserPayload = {
       userId: result.user.id,
-      email: result.user.email,
+      email: result.user.emailAddress,
       role: result.user.role as Role,
-      partnerId: result.partner.id
+      partnerId: result.affiliate.id
     };
     const accessToken = generateAccessToken(tokenPayload);
+    const sanitizedUser = buildAuthenticatedUser(result.user, result.affiliate);
 
-    const sanitizedUser: AuthenticatedUser = {
-      id: result.user.id,
-      email: result.user.email,
-      fullName: result.user.fullName,
-      phone: result.user.phone,
-      role: result.user.role as Role,
-      isActive: result.user.isActive,
-      avatarUrl: result.user.avatarUrl,
-      partnerId: result.partner.id,
-      partnerCode: result.partner.partnerCode,
-      partnerStatus: result.partner.status as PartnerStatus,
-      rejectionReason: null
-    };
+    // Send WhatsApp & Email using first name only (skip external dispatch for synthetic test addresses in OTP bypass mode)
+    const isSyntheticTestEmail =
+      isTestOtpBypass && (emailLower.endsWith('@test.iotaacademy.in') || emailLower.endsWith('@example.com'));
 
-    // Extract only first name in capital case for greeting messages (e.g. "Hi Arvind" instead of "Hi Arvind Vishwakarma")
-    const rawFirstName = data.firstName?.trim() || fullName.split(/\s+/)[0] || 'Partner';
-    const firstName = toCapitalCase(rawFirstName);
+    if (!isSyntheticTestEmail) {
+      whatsappOtpService.sendAffiliateRegistrationWhatsApp(cleanWhatsappDigits, firstName).catch((waErr) => {
+        logger.warn('[WhatsApp Registration Message] Dispatch warning:', waErr);
+      });
 
-    // Send WhatsApp notification to the newly registered affiliate (Template: affiliate_registration_done)
-    whatsappOtpService.sendAffiliateRegistrationWhatsApp(cleanWhatsappDigits, firstName).catch((waErr) => {
-      logger.warn('[WhatsApp Registration Message] Dispatch warning:', waErr);
-    });
+      emailOtpService.sendAffiliateRegistrationEmail(emailLower, firstName).catch((mailErr) => {
+        logger.warn('[Email Registration Message] Dispatch warning:', mailErr);
+      });
+    }
 
-    // Send confirmation Email to the newly registered affiliate
-    emailOtpService.sendAffiliateRegistrationEmail(userEmail, firstName).catch((mailErr) => {
-      logger.warn('[Email Registration Message] Dispatch warning:', mailErr);
-    });
-
-    // Notify all active Admins about the new affiliate application (non-blocking)
+    // Notify active Admins about the new affiliate application (non-blocking)
     try {
       const admins = await prisma.user.findMany({
         where: { role: Role.ADMIN, isActive: true },
@@ -915,8 +924,8 @@ export class PartnerService {
         await prisma.notification.createMany({
           data: admins.map((a) => ({
             userId: a.id,
-            title: `New Affiliate Application [${result.partner.partnerCode}]`,
-            message: `${fullName} (${displayCategory}, ${data.state.trim()}) submitted an affiliate application. Review pending approval.`,
+            title: `New Affiliate Application [${result.affiliate.affiliateCode}]`,
+            message: `${fullName} (${data.occupation}, ${state}) submitted an affiliate application. Review pending approval.`,
             actionUrl: '/admin/partners'
           }))
         });
@@ -926,12 +935,12 @@ export class PartnerService {
     }
 
     return {
-      partnerId: result.partner.id,
-      partnerCode: result.partner.partnerCode,
-      affiliateCode: result.partner.partnerCode,
-      businessName: result.partner.businessName,
-      ownerName: result.partner.ownerName,
-      status: result.partner.status,
+      partnerId: result.affiliate.id,
+      partnerCode: result.affiliate.affiliateCode,
+      affiliateCode: result.affiliate.affiliateCode,
+      businessName: formatAffiliateBusinessName(result.affiliate),
+      ownerName: fullName,
+      status: result.affiliate.status,
       user: sanitizedUser,
       accessToken,
       message: 'Affiliate application submitted successfully. Your profile is currently pending approval.'
