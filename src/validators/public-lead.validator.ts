@@ -24,9 +24,25 @@ export function normalizeIndianPhone(input: string): string {
   return cleaned;
 }
 
+export function toCapitalCase(str?: string | null): string {
+  if (!str) return '';
+  return str
+    .trim()
+    .split(/\s+/)
+    .map((word) => {
+      if (!word) return '';
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ');
+}
+
 export const publicStudentLeadSchema = z.object({
   partnerCode: z.string({ required_error: 'Partner code is required' }).trim().toUpperCase(),
-  studentName: z.string({ required_error: 'Full name is required' }).min(2, 'Name must be at least 2 characters').trim(),
+  studentName: z
+    .string({ required_error: 'Full name is required' })
+    .min(2, 'Name must be at least 2 characters')
+    .trim()
+    .transform(toCapitalCase),
   mobile: z
     .string({ required_error: 'Mobile number is required' })
     .transform(normalizeIndianPhone)
@@ -42,7 +58,7 @@ export const publicStudentLeadSchema = z.object({
     }),
   interestedCourseId: z.string().optional(),
   currentEducation: z.string().min(2, 'Current educational background is required').trim(),
-  city: z.string().min(2, 'City is required').trim(),
+  city: z.string().min(2, 'City is required').trim().transform(toCapitalCase),
   area: z.string().optional(),
   preferredContactTime: z.enum(['MORNING_10AM_1PM', 'AFTERNOON_1PM_4PM', 'EVENING_4PM_7PM', 'ANYTIME']).default('ANYTIME'),
   communicationConsent: z.boolean({ required_error: 'Communication consent is required' }).refine((val) => val === true, {

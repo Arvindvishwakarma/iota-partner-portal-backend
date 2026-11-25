@@ -17,7 +17,8 @@ import { hashPassword } from '../utils/password';
 import {
   PublicPartnerRegisterInput,
   mapCategoryToEnum,
-  isIndividualOccupation
+  isIndividualOccupation,
+  toCapitalCase
 } from '../validators/public-partner.validator';
 import { generateUniqueAffiliateCode } from '../utils/affiliate-code';
 import { RequestWithdrawalInput } from '../validators/settlement.validator';
@@ -581,10 +582,11 @@ export class PartnerService {
    * Public Partner Self-Registration from Landing Page
    */
   async registerPublicPartner(data: PublicPartnerRegisterInput) {
-    const fullName = (data.fullName || `${data.firstName || ''} ${data.lastName || ''}`).trim();
-    if (!fullName) {
+    const rawFullName = (data.fullName || `${data.firstName || ''} ${data.lastName || ''}`).trim();
+    if (!rawFullName) {
       throw new AppError('Full name is required', 400, 'INVALID_NAME');
     }
+    const fullName = toCapitalCase(rawFullName);
 
     const cleanMobileDigits = data.phone.replace(/\D/g, '').slice(-10);
     const normalizedMobile = `+91${cleanMobileDigits}`;
@@ -718,9 +720,9 @@ export class PartnerService {
       );
     }
 
-    // 4. Hash default password for the affiliate's future portal access
-    const defaultPassword = 'Partner@123456';
-    const passwordHash = await hashPassword(defaultPassword);
+    // 4. Hash chosen password for the affiliate's portal access
+    const passwordToHash = data.password || 'Partner@123456';
+    const passwordHash = await hashPassword(passwordToHash);
 
     const chosenCategory = data.occupation?.trim() || data.category?.trim() || 'Student';
     const isIndividual = isIndividualOccupation(chosenCategory);
@@ -784,7 +786,7 @@ export class PartnerService {
           email: partnerEmail,
           addressLine1,
           addressLine2, // Stores social profile links and custom notes
-          city: (data.city && data.city.trim()) ? data.city.trim() : data.state.trim(),
+          city: toCapitalCase((data.city && data.city.trim()) ? data.city.trim() : data.state.trim()),
           area: '',
           pincode: data.pincode.trim(),
           registrationUrl,

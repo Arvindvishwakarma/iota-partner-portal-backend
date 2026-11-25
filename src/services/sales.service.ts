@@ -10,6 +10,7 @@ import {
 import { hashPassword } from '../utils/password';
 import { env } from '../config/environment';
 import { generateUniqueAffiliateCode } from '../utils/affiliate-code';
+import { toCapitalCase } from '../validators/public-partner.validator';
 import {
   CheckInInput,
   CheckOutInput,
@@ -525,7 +526,7 @@ export class SalesService {
         data: {
           email: data.email,
           phone: normalizedMobile,
-          fullName: data.ownerName,
+          fullName: toCapitalCase(data.ownerName),
           passwordHash,
           role: Role.PARTNER,
           isActive: true
@@ -541,14 +542,14 @@ export class SalesService {
           partnerCode,
           businessName: data.businessName,
           category: data.category,
-          ownerName: data.ownerName,
-          contactPerson: data.contactPerson || data.ownerName,
+          ownerName: toCapitalCase(data.ownerName),
+          contactPerson: data.contactPerson || toCapitalCase(data.ownerName),
           mobile: normalizedMobile,
           whatsapp: data.whatsapp ? `+91${data.whatsapp}` : normalizedMobile,
           email: data.email,
           addressLine1: data.addressLine1,
           addressLine2: data.addressLine2 || null,
-          city: data.city,
+          city: toCapitalCase(data.city),
           area: data.area,
           pincode: data.pincode,
           latitude: data.latitude || null,

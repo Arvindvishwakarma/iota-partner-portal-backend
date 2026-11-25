@@ -11,6 +11,7 @@ import {
   NotificationStatus
 } from '../shared';
 import { logger } from '../config/logger';
+import { toCapitalCase } from '../validators/public-lead.validator';
 
 export class LeadService {
   /**
@@ -181,11 +182,11 @@ export class LeadService {
           partnerId: partner.id,
           interestedCourseId: resolvedCourseId,
           source: LeadSource.PARTNER_QR,
-          studentName: data.studentName,
+          studentName: toCapitalCase(data.studentName),
           mobile: data.mobile,
           whatsapp: data.whatsapp || data.mobile,
           currentEducation: data.currentEducation,
-          city: data.city,
+          city: toCapitalCase(data.city),
           area: data.area,
           preferredContactTime: data.preferredContactTime,
           communicationConsent: data.communicationConsent,

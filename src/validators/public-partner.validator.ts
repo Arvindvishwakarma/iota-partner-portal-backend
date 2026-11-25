@@ -3,6 +3,22 @@ import { normalizeIndianPhone } from './public-lead.validator';
 import { INDIAN_PHONE_REGEX, PartnerCategory } from '../shared';
 
 /**
+ * Transforms any string into Capital Case (Title Case).
+ * E.g., "arvind" -> "Arvind", "indore" -> "Indore", "arvind kumar" -> "Arvind Kumar".
+ */
+export function toCapitalCase(str?: string | null): string {
+  if (!str) return '';
+  return str
+    .trim()
+    .split(/\s+/)
+    .map((word) => {
+      if (!word) return '';
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ');
+}
+
+/**
  * Single source of truth for whether an occupation/category is an individual (no firm name required).
  */
 export function isIndividualOccupation(cat?: string | null): boolean {
@@ -66,9 +82,27 @@ export function mapCategoryToEnum(cat?: string | null): PartnerCategory {
 
 export const publicPartnerRegisterSchema = z
   .object({
-    firstName: z.string().trim().max(60, 'First name must be at most 60 characters').optional().nullable(),
-    lastName: z.string().trim().max(60, 'Last name must be at most 60 characters').optional().nullable(),
-    fullName: z.string().trim().max(125, 'Full name must be at most 125 characters').optional().nullable(),
+    firstName: z
+      .string()
+      .trim()
+      .max(60, 'First name must be at most 60 characters')
+      .optional()
+      .nullable()
+      .transform((val) => (val ? toCapitalCase(val) : val)),
+    lastName: z
+      .string()
+      .trim()
+      .max(60, 'Last name must be at most 60 characters')
+      .optional()
+      .nullable()
+      .transform((val) => (val ? toCapitalCase(val) : val)),
+    fullName: z
+      .string()
+      .trim()
+      .max(125, 'Full name must be at most 125 characters')
+      .optional()
+      .nullable()
+      .transform((val) => (val ? toCapitalCase(val) : val)),
     phone: z
       .string({ required_error: 'Mobile number is required' })
       .transform(normalizeIndianPhone)
@@ -88,6 +122,13 @@ export const publicPartnerRegisterSchema = z
       .trim()
       .min(1, 'Email address is required')
       .email('Please enter a valid email address'),
+    password: z
+      .string({ required_error: 'Password is required' })
+      .min(8, 'Password must be at least 8 characters long')
+      .regex(/[A-Za-z]/, 'Password must contain at least one alphabet letter')
+      .regex(/[0-9]/, 'Password must contain at least one digit (0–9)')
+      .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
+    confirmPassword: z.string({ required_error: 'Please confirm your password' }),
     category: z.string().trim().max(100).optional().nullable(),
     occupation: z.string().trim().max(100).optional().nullable(),
     gender: z
@@ -120,7 +161,8 @@ export const publicPartnerRegisterSchema = z
       .min(2, 'Please enter your city')
       .max(100, 'City must be at most 100 characters')
       .optional()
-      .nullable(),
+      .nullable()
+      .transform((val) => (val ? toCapitalCase(val) : val)),
     state: z
       .string({ required_error: 'State is required' })
       .trim()
@@ -143,6 +185,14 @@ export const publicPartnerRegisterSchema = z
         code: z.ZodIssueCode.custom,
         path: ['firstName'],
         message: 'Full name is required'
+      });
+    }
+
+    if (data.password !== data.confirmPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['confirmPassword'],
+        message: 'Passwords do not match (case-sensitive)'
       });
     }
 
