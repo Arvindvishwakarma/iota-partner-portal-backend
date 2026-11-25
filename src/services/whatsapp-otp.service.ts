@@ -632,6 +632,98 @@ export class WhatsAppOtpService {
 
     return result;
   }
+
+  /**
+   * Dispatch Registration Confirmation message via Meta WhatsApp template "affiliate_registration_done"
+   */
+  public async sendAffiliateRegistrationWhatsApp(
+    phone: string,
+    affiliateName: string
+  ): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+    const cleanPhone = this.normalizePhone(phone);
+    // Use only first name with Capital Case (e.g. "Hi Arvind" not "Hi Arvind Vishwakarma")
+    const rawFirst = (affiliateName || 'Partner').trim().split(/\s+/)[0] || 'Partner';
+    const firstName = rawFirst.charAt(0).toUpperCase() + rawFirst.slice(1).toLowerCase();
+
+    const { waToken, waPhoneId } = this.getCredentials();
+
+    if (!waToken || !waPhoneId) {
+      logger.info(`[WhatsApp API] Credentials missing. Simulated registration WhatsApp message to +91${cleanPhone} for ${firstName}.`);
+      return { ok: false, error: 'Credentials not configured' };
+    }
+
+    const recipientWithCountry = `91${cleanPhone}`;
+    const url = `https://graph.facebook.com/v20.0/${waPhoneId}/messages`;
+    const templateName = 'affiliate_registration_done';
+
+    // Try candidates: en first (matching Meta configuration), then en_US
+    const candidates = [
+      {
+        desc: 'affiliate_registration_done (en)',
+        payload: {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: recipientWithCountry,
+          type: 'template',
+          template: {
+            name: templateName,
+            language: { code: 'en' },
+            components: [
+              {
+                type: 'body',
+                parameters: [{ type: 'text', text: firstName }]
+              }
+            ]
+          }
+        }
+      },
+      {
+        desc: 'affiliate_registration_done (en_US)',
+        payload: {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: recipientWithCountry,
+          type: 'template',
+          template: {
+            name: templateName,
+            language: { code: 'en_US' },
+            components: [
+              {
+                type: 'body',
+                parameters: [{ type: 'text', text: firstName }]
+              }
+            ]
+          }
+        }
+      }
+    ];
+
+    for (const candidate of candidates) {
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${waToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(candidate.payload)
+        });
+
+        const data: any = await response.json();
+        if (response.ok && data?.messages?.[0]?.id) {
+          const msgId = data.messages[0].id;
+          logger.info(`[WhatsApp API Success] Registration confirmation sent via template '${templateName}' to +91${cleanPhone}. ID: ${msgId}`);
+          return { ok: true, messageId: msgId };
+        } else {
+          logger.warn(`[WhatsApp API] Template candidate ${candidate.desc} response:`, data?.error?.message || data);
+        }
+      } catch (err: any) {
+        logger.warn(`[WhatsApp API] Network error for candidate ${candidate.desc}:`, err.message);
+      }
+    }
+
+    return { ok: false, error: 'Failed to deliver WhatsApp registration template' };
+  }
 }
 
 export const whatsappOtpService = new WhatsAppOtpService();

@@ -16,6 +16,8 @@ import {
   CheckOutInput,
   OnboardPartnerInput
 } from '../validators/sales.validator';
+import { whatsappOtpService } from './whatsapp-otp.service';
+import { emailOtpService } from './email-otp.service';
 
 /**
  * Calculate geographical distance in meters between two lat/lng coordinates (Haversine formula)
@@ -609,6 +611,21 @@ export class SalesService {
 
       return newPartner;
     });
+
+    // Notify newly onboarded partner via WhatsApp and Email (First name only: e.g. "Hi Arvind")
+    const cleanWhatsapp = (data.whatsapp || data.mobile).replace(/\D/g, '').slice(-10);
+    const rawFirst = (data.ownerName || 'Partner').trim().split(/\s+/)[0];
+    const firstName = toCapitalCase(rawFirst);
+
+    whatsappOtpService.sendAffiliateRegistrationWhatsApp(cleanWhatsapp, firstName).catch((waErr) => {
+      console.warn('[Sales Onboard Partner WhatsApp] Dispatch warning:', waErr);
+    });
+
+    if (data.email) {
+      emailOtpService.sendAffiliateRegistrationEmail(data.email, firstName).catch((mailErr) => {
+        console.warn('[Sales Onboard Partner Email] Dispatch warning:', mailErr);
+      });
+    }
 
     return partner;
   }

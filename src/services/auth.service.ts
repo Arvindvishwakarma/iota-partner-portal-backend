@@ -35,7 +35,7 @@ export class AuthService {
       },
       include: {
         partnerProfile: {
-          select: { id: true, partnerCode: true, status: true }
+          select: { id: true, partnerCode: true, status: true, rejectionReason: true }
         }
       }
     });
@@ -83,7 +83,9 @@ export class AuthService {
       isActive: user.isActive,
       avatarUrl: user.avatarUrl,
       partnerId,
-      partnerCode: user.partnerProfile?.partnerCode
+      partnerCode: user.partnerProfile?.partnerCode,
+      partnerStatus: user.partnerProfile?.status as any,
+      rejectionReason: user.partnerProfile?.rejectionReason || null
     };
 
     return {
@@ -127,7 +129,7 @@ export class AuthService {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        partnerProfile: { select: { id: true, partnerCode: true, status: true } }
+        partnerProfile: { select: { id: true, partnerCode: true, status: true, rejectionReason: true } }
       }
     });
 
@@ -144,7 +146,9 @@ export class AuthService {
       isActive: user.isActive,
       avatarUrl: user.avatarUrl,
       partnerId: user.partnerProfile?.id,
-      partnerCode: user.partnerProfile?.partnerCode
+      partnerCode: user.partnerProfile?.partnerCode,
+      partnerStatus: user.partnerProfile?.status as any,
+      rejectionReason: user.partnerProfile?.rejectionReason || null
     };
   }
 

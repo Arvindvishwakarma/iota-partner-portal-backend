@@ -475,6 +475,158 @@ export class EmailOtpService {
 
     return false;
   }
+
+  /**
+   * Internal generic mail dispatcher using nodemailer
+   */
+  public async sendCustomEmail(toEmail: string, subject: string, text: string, html: string): Promise<boolean> {
+    const { host, port, secure, user, pass, from } = this.getCredentials();
+
+    if (!host || !user || !pass || host === 'smtp.example.com') {
+      logger.info(`[Email Sandbox] Live SMTP credentials not configured. Simulated email for ${toEmail}: ${subject}`);
+      return false;
+    }
+
+    try {
+      const nodemailer = require('nodemailer');
+      const transportConfig: any = {
+        auth: { user, pass }
+      };
+
+      if (host.includes('gmail') || host.includes('google')) {
+        transportConfig.service = 'gmail';
+      } else {
+        transportConfig.host = host;
+        transportConfig.port = port;
+        transportConfig.secure = secure;
+      }
+
+      const transporter = nodemailer.createTransport(transportConfig);
+
+      const info = await transporter.sendMail({
+        from,
+        to: toEmail,
+        subject,
+        text,
+        html
+      });
+
+      logger.info(`[Email Service] Sent email to ${toEmail} via nodemailer. ID: ${info.messageId || 'OK'}`);
+      this.logEmailDiagnostic({
+        timestamp: new Date().toISOString(),
+        success: true,
+        transport: 'nodemailer',
+        toEmail,
+        subject,
+        messageId: info.messageId
+      });
+      return true;
+    } catch (e: any) {
+      logger.error(`[Email Service] Failed to send email to ${toEmail}:`, e.message);
+      return false;
+    }
+  }
+
+  /**
+   * Send Welcome / Registration confirmation email to newly registered affiliate
+   */
+  public async sendAffiliateRegistrationEmail(toEmail: string, affiliateName: string): Promise<boolean> {
+    const cleanEmail = this.normalizeEmail(toEmail);
+    // Use only first name with Capital Case (e.g. "Hi Arvind" not "Hi Arvind Vishwakarma")
+    const rawFirst = (affiliateName || 'Partner').trim().split(/\s+/)[0] || 'Partner';
+    const firstName = rawFirst.charAt(0).toUpperCase() + rawFirst.slice(1).toLowerCase();
+
+    const subject = 'Thank you for registering with the IOTA Academy Affiliate Program!';
+
+    const textBody = `Hi ${firstName},
+
+Thank you for registering with the IOTA Academy Affiliate Program!
+Your profile has been successfully created and is currently Pending Approval.
+
+What happens next?
+Our team is reviewing your registration details. Please wait while this process is completed.
+We will notify you within 7 business days with an update and the next steps to complete your KYC verification.
+Once your profile is approved, you will receive further instructions to proceed with KYC document submission.
+
+Thank you for your patience and interest in partnering with IOTA Academy.
+
+Regards,
+Team IOTA Academy
+Website: https://affiliate.iotaacademy.in
+Email: affiliate@iotaacademy.in
+WhatsApp: +91 89625 45150`;
+
+    const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>IOTA Academy Affiliate Program</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="100%" style="max-width: 580px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); padding: 32px 30px; text-align: center;">
+              <h1 style="color: #ffffff; font-size: 22px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">IOTA ACADEMY</h1>
+              <p style="color: #bfdbfe; font-size: 13px; margin: 6px 0 0; font-weight: 500;">Affiliate Program</p>
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding: 36px 32px; color: #1e293b; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 0 0 16px; font-size: 16px; font-weight: 700; color: #0f172a;">Hi ${firstName},</p>
+              <p style="margin: 0 0 16px;">Thank you for registering with the <strong>IOTA Academy Affiliate Program</strong>!</p>
+              <p style="margin: 0 0 20px;">Your profile has been successfully created and is currently <strong>Pending Approval</strong>.</p>
+              
+              <div style="background-color: #f1f5f9; border-left: 4px solid #2563eb; border-radius: 8px; padding: 16px 20px; margin: 0 0 24px;">
+                <h3 style="margin: 0 0 10px; font-size: 14px; font-weight: 700; color: #0f172a;">What happens next?</h3>
+                <p style="margin: 0 0 8px; color: #334155; font-size: 13px;">• Our team is reviewing your registration details. Please wait while this process is completed.</p>
+                <p style="margin: 0 0 8px; color: #334155; font-size: 13px;">• We will notify you within <strong>7 business days</strong> with an update and the next steps to complete your KYC verification.</p>
+                <p style="margin: 0; color: #334155; font-size: 13px;">• Once your profile is approved, you will receive further instructions to proceed with KYC document submission.</p>
+              </div>
+
+              <p style="margin: 0 0 24px;">Thank you for your patience and interest in partnering with IOTA Academy.</p>
+
+              <p style="margin: 0 0 4px; font-weight: 600;">Regards,</p>
+              <p style="margin: 0 0 16px; font-weight: 700; color: #1e3a8a;">Team IOTA Academy</p>
+
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
+                <tr>
+                  <td style="padding: 3px 0;"><strong>Website:</strong> <a href="https://affiliate.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://affiliate.iotaacademy.in</a></td>
+                </tr>
+                <tr>
+                  <td style="padding: 3px 0;"><strong>Email:</strong> <a href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
+                </tr>
+                <tr>
+                  <td style="padding: 3px 0;"><strong>WhatsApp:</strong> <a href="https://wa.me/918962545150" style="color: #2563eb; text-decoration: none;" target="_blank">+91 89625 45150</a></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="color: #94a3b8; font-size: 11px; margin: 0;">
+                © 2026 TECHIOTA LLP (IOTA Academy). All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `.trim();
+
+    return this.sendCustomEmail(cleanEmail, subject, textBody, htmlBody);
+  }
 }
 
 export const emailOtpService = new EmailOtpService();

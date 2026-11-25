@@ -44,7 +44,7 @@ export class PublicController {
       res.status(201).json({
         success: true,
         data: result,
-        message: 'Your affiliate application has been submitted successfully! Our team will contact you shortly to activate your dashboard.'
+        message: 'Your affiliate account has been registered and activated successfully! You can now log in to your dashboard.'
       });
     } catch (err) {
       next(err);

@@ -212,5 +212,7 @@ export interface AuthenticatedUser {
   avatarUrl?: string | null;
   partnerId?: string | null;
   partnerCode?: string | null;
+  partnerStatus?: PartnerStatus | null;
+  rejectionReason?: string | null;
 }
 

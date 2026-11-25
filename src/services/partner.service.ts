@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
+import { logger } from '../config/logger';
 import { AppError } from '../middlewares/error.middleware';
 import { generateQrPngDataUrl, generateQrSvgString } from '../utils/qrcode';
 import {
@@ -10,10 +11,13 @@ import {
   TicketPriority,
   PartnerStatus,
   Role,
-  STUDENT_REFUND_WINDOW_DAYS
+  STUDENT_REFUND_WINDOW_DAYS,
+  AuthenticatedUser,
+  JwtUserPayload
 } from '../shared';
 import { env } from '../config/environment';
 import { hashPassword } from '../utils/password';
+import { generateAccessToken } from '../utils/jwt';
 import {
   PublicPartnerRegisterInput,
   mapCategoryToEnum,
@@ -37,9 +41,17 @@ export class PartnerService {
         partnerCode: true,
         businessName: true,
         ownerName: true,
+        contactPerson: true,
+        category: true,
+        mobile: true,
+        whatsapp: true,
+        email: true,
         status: true,
         city: true,
+        addressLine1: true,
         registrationUrl: true,
+        rejectionReason: true,
+        createdAt: true,
         bankAccountName: true,
         bankAccountNumber: true,
         bankIfsc: true,
@@ -49,6 +61,47 @@ export class PartnerService {
     });
 
     if (!partner) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
+
+    // If partner is not ACTIVE (e.g. PENDING_APPROVAL, REJECTED, SUSPENDED), restrict access to dashboard, referral link, QR code and features
+    if (partner.status !== PartnerStatus.ACTIVE) {
+      return {
+        partner: {
+          id: partner.id,
+          partnerCode: partner.partnerCode,
+          businessName: partner.businessName,
+          ownerName: partner.ownerName,
+          contactPerson: partner.contactPerson,
+          category: partner.category,
+          mobile: partner.mobile,
+          whatsapp: partner.whatsapp,
+          email: partner.email,
+          city: partner.city,
+          addressLine1: partner.addressLine1,
+          status: partner.status,
+          registrationUrl: '', // Hide referral link until approved
+          rejectionReason: partner.rejectionReason,
+          createdAt: partner.createdAt
+        },
+        metrics: {
+          totalStudentsReferred: 0,
+          activeLeads: 0,
+          totalEarningsExpected: 0,
+          totalEarningsWithdrawable: 0,
+          totalLeads: 0,
+          todayLeads: 0,
+          admissionsCount: 0,
+          totalCommission: 0,
+          pendingCommission: 0,
+          withdrawableCommission: 0,
+          paidCommission: 0
+        },
+        recentLeads: [],
+        activeSettlement: null,
+        qrPngDataUrl: '',
+        qrSvgString: '',
+        isRestricted: true
+      };
+    }
 
     // Auto promote cooling-off commissions
     const fourteenDaysAgo = new Date(Date.now() - STUDENT_REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000);
@@ -452,6 +505,12 @@ export class PartnerService {
    * List Attributed Leads for Partner (Read-Only Statuses)
    */
   async getLeads(partnerId: string, status?: LeadStatus, search?: string, page = 1, limit = 20) {
+    const partner = await prisma.partner.findUnique({ where: { id: partnerId }, select: { status: true } });
+    if (!partner) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
+    if (partner.status !== PartnerStatus.ACTIVE) {
+      throw new AppError('Leads tracker is restricted while your registration is pending approval.', 403, 'ACCOUNT_RESTRICTED');
+    }
+
     const where: any = { partnerId };
 
     if (status) where.status = status;
@@ -498,6 +557,12 @@ export class PartnerService {
    * Commission Ledger for Partner
    */
   async getCommissions(partnerId: string, page = 1, limit = 20) {
+    const partner = await prisma.partner.findUnique({ where: { id: partnerId }, select: { status: true } });
+    if (!partner) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
+    if (partner.status !== PartnerStatus.ACTIVE) {
+      throw new AppError('Commission earnings are restricted while your registration is pending approval.', 403, 'ACCOUNT_RESTRICTED');
+    }
+
     const where = { partnerId };
 
     const [total, commissions] = await Promise.all([
@@ -537,6 +602,12 @@ export class PartnerService {
    * Settlement Payout History for Partner
    */
   async getSettlements(partnerId: string, page = 1, limit = 20) {
+    const partner = await prisma.partner.findUnique({ where: { id: partnerId }, select: { status: true } });
+    if (!partner) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
+    if (partner.status !== PartnerStatus.ACTIVE) {
+      throw new AppError('Settlement history is restricted while your registration is pending approval.', 403, 'ACCOUNT_RESTRICTED');
+    }
+
     const where = { partnerId };
 
     const [total, settlements] = await Promise.all([
@@ -757,7 +828,7 @@ export class PartnerService {
       // Generate a unique 6-character alphanumeric affiliate code (e.g. "7K9M2X")
       const partnerCode = await generateUniqueAffiliateCode(tx);
 
-      // Create user login account (inactive until admin reviews and approves)
+      // Create user login account (active immediately so affiliate can log in)
       const user = await tx.user.create({
         data: {
           email: userEmail,
@@ -765,14 +836,14 @@ export class PartnerService {
           fullName,
           passwordHash,
           role: Role.PARTNER,
-          isActive: false
+          isActive: true
         }
       });
 
       const frontendBase = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
       const registrationUrl = `${frontendBase}/register/${partnerCode}`;
 
-      // Create affiliate record with PENDING_APPROVAL status
+      // Create affiliate record with ACTIVE status
       const partner = await tx.partner.create({
         data: {
           userId: user.id,
@@ -797,6 +868,43 @@ export class PartnerService {
       return { partner, user };
     });
 
+    // Issue Access Token so the affiliate can access their account (restricted pending approval)
+    const tokenPayload: JwtUserPayload = {
+      userId: result.user.id,
+      email: result.user.email,
+      role: result.user.role as Role,
+      partnerId: result.partner.id
+    };
+    const accessToken = generateAccessToken(tokenPayload);
+
+    const sanitizedUser: AuthenticatedUser = {
+      id: result.user.id,
+      email: result.user.email,
+      fullName: result.user.fullName,
+      phone: result.user.phone,
+      role: result.user.role as Role,
+      isActive: result.user.isActive,
+      avatarUrl: result.user.avatarUrl,
+      partnerId: result.partner.id,
+      partnerCode: result.partner.partnerCode,
+      partnerStatus: result.partner.status as PartnerStatus,
+      rejectionReason: null
+    };
+
+    // Extract only first name in capital case for greeting messages (e.g. "Hi Arvind" instead of "Hi Arvind Vishwakarma")
+    const rawFirstName = data.firstName?.trim() || fullName.split(/\s+/)[0] || 'Partner';
+    const firstName = toCapitalCase(rawFirstName);
+
+    // Send WhatsApp notification to the newly registered affiliate (Template: affiliate_registration_done)
+    whatsappOtpService.sendAffiliateRegistrationWhatsApp(cleanWhatsappDigits, firstName).catch((waErr) => {
+      logger.warn('[WhatsApp Registration Message] Dispatch warning:', waErr);
+    });
+
+    // Send confirmation Email to the newly registered affiliate
+    emailOtpService.sendAffiliateRegistrationEmail(userEmail, firstName).catch((mailErr) => {
+      logger.warn('[Email Registration Message] Dispatch warning:', mailErr);
+    });
+
     // Notify all active Admins about the new affiliate application (non-blocking)
     try {
       const admins = await prisma.user.findMany({
@@ -808,13 +916,13 @@ export class PartnerService {
           data: admins.map((a) => ({
             userId: a.id,
             title: `New Affiliate Application [${result.partner.partnerCode}]`,
-            message: `${fullName} (${displayCategory}, ${data.state.trim()}) applied to join the IOTA Academy Affiliate Program.`,
-            actionUrl: '/admin/partners?status=PENDING_APPROVAL'
+            message: `${fullName} (${displayCategory}, ${data.state.trim()}) submitted an affiliate application. Review pending approval.`,
+            actionUrl: '/admin/partners'
           }))
         });
       }
     } catch (notifyErr) {
-      console.warn('Could not create admin notification for new affiliate application:', notifyErr);
+      console.warn('Could not create admin notification for new affiliate registration:', notifyErr);
     }
 
     return {
@@ -824,7 +932,9 @@ export class PartnerService {
       businessName: result.partner.businessName,
       ownerName: result.partner.ownerName,
       status: result.partner.status,
-      message: 'Affiliate application submitted successfully. Pending admin review.'
+      user: sanitizedUser,
+      accessToken,
+      message: 'Affiliate application submitted successfully. Your profile is currently pending approval.'
     };
   }
 }
