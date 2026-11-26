@@ -52,6 +52,16 @@ export class PartnerController {
     }
   }
 
+  async getLeadById(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const partnerId = this.getPartnerId(req);
+      const lead = await partnerService.getLeadById(partnerId, req.params.id);
+      res.status(200).json({ success: true, data: lead });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async getCommissions(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const partnerId = this.getPartnerId(req);

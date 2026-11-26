@@ -4,8 +4,13 @@ import { logger } from '../config/logger';
 import { AppError } from '../middlewares/error.middleware';
 import { generateQrPngDataUrl, generateQrSvgString } from '../utils/qrcode';
 import {
+  deriveMainStatusFromLegacy,
+  findPipelineStage
+} from '../shared/pipeline-statuses';
+import {
   AdmissionStatus,
   CommissionStatus,
+  LeadActivityType,
   LeadStatus,
   SettlementStatus,
   TicketPriority,
@@ -617,6 +622,86 @@ export class PartnerService {
     return {
       leads,
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) }
+    };
+  }
+
+  private maskPhoneForAffiliate(raw?: string | null): string {
+  const digits = (raw || '').replace(/\D/g, '').slice(-10);
+  if (digits.length < 4) return 'XXXXXXXXXX';
+  return `+91 XXXXXX${digits.slice(-4)}`;
+}
+
+  /**
+   * Get Single Attributed Referral Details for Partner (Read-Only, Masked Contact)
+   */
+  async getLeadById(partnerId: string, leadId: string) {
+    const affiliate = await prisma.affiliate.findUnique({ where: { id: partnerId }, select: { status: true } });
+    if (!affiliate) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
+    if (affiliate.status !== AffiliateStatus.ACTIVE) {
+      throw new AppError('Referral details are restricted while your registration is pending approval.', 403, 'ACCOUNT_RESTRICTED');
+    }
+
+    const lead = await prisma.lead.findFirst({
+      where: { id: leadId, partnerId },
+      select: {
+        id: true,
+        leadCode: true,
+        studentName: true,
+        mobile: true,
+        whatsapp: true,
+        whatsappOtpVerified: true,
+        city: true,
+        currentEducation: true,
+        preferredContactTime: true,
+        preferredLearningMode: true,
+        status: true,
+        currentMainStatus: true,
+        currentSubStatus: true,
+        lastStatusRemark: true,
+        createdAt: true,
+        interestedCourse: { select: { id: true, name: true, feeAmount: true, durationWeeks: true } },
+        admission: { select: { id: true, admissionCode: true, status: true } },
+        duplicateSubmissions: {
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, createdAt: true }
+        },
+        activities: {
+          where: { activityType: LeadActivityType.STATUS_CHANGE },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { remarks: true }
+        }
+      }
+    });
+
+    if (!lead) {
+      throw new AppError('Referral record not found', 404, 'NOT_FOUND');
+    }
+
+    const canonicalStoredStage = findPipelineStage(lead.currentMainStatus);
+    const resolvedMainStatus =
+      canonicalStoredStage?.mainStatus ||
+      deriveMainStatusFromLegacy(lead.status, lead.admission?.status);
+
+    return {
+      id: lead.id,
+      leadCode: lead.leadCode,
+      studentName: lead.studentName,
+      mobile: this.maskPhoneForAffiliate(lead.mobile),
+      whatsapp: this.maskPhoneForAffiliate(lead.whatsapp || lead.mobile),
+      whatsappOtpVerified: lead.whatsappOtpVerified,
+      city: lead.city,
+      currentEducation: lead.currentEducation,
+      preferredContactTime: lead.preferredContactTime,
+      preferredLearningMode: lead.preferredLearningMode,
+      status: lead.status,
+      currentMainStatus: resolvedMainStatus,
+      currentSubStatus: lead.currentSubStatus || null,
+      lastStatusRemark: lead.lastStatusRemark ?? lead.activities[0]?.remarks ?? null,
+      createdAt: lead.createdAt,
+      interestedCourse: lead.interestedCourse,
+      admission: lead.admission,
+      duplicateSubmissions: lead.duplicateSubmissions
     };
   }
 

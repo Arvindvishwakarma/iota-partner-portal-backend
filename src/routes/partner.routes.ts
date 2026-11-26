@@ -15,6 +15,7 @@ router.use(authenticateJwt, requireRole([Role.AFFILIATE, Role.PARTNER]));
 router.get('/dashboard', partnerController.getDashboard.bind(partnerController));
 router.post('/kyc', validateBody(submitKycSchema), partnerController.submitKyc.bind(partnerController));
 router.get('/leads', partnerController.getLeads.bind(partnerController));
+router.get('/leads/:id', partnerController.getLeadById.bind(partnerController));
 router.get('/commissions', partnerController.getCommissions.bind(partnerController));
 router.get('/settlements', partnerController.getSettlements.bind(partnerController));
 router.post('/withdraw', validateBody(requestWithdrawalSchema), partnerController.requestWithdrawal.bind(partnerController));
