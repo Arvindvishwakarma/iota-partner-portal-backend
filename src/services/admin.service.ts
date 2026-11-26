@@ -549,7 +549,10 @@ export class AdminService {
 
     const updated = await prisma.affiliate.update({
       where: { id: partnerId },
-      data: { status }
+      data: {
+        status,
+        ...(status === AffiliateStatus.KYC_PENDING ? { rejectionReason: null } : {})
+      }
     });
     return mapAffiliateRow(updated);
   }

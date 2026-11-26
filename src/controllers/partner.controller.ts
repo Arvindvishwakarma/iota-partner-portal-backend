@@ -23,6 +23,20 @@ export class PartnerController {
     }
   }
 
+  async submitKyc(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const partnerId = this.getPartnerId(req);
+      const result = await partnerService.submitKyc(partnerId, req.body);
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: 'KYC details submitted successfully and sent for admin verification.'
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async getLeads(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const partnerId = this.getPartnerId(req);

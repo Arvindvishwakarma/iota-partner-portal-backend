@@ -21,6 +21,7 @@ import {
   PublicPartnerRegisterInput,
   toCapitalCase
 } from '../validators/public-partner.validator';
+import { SubmitKycInput } from '../validators/partner-kyc.validator';
 import { generateUniqueAffiliateCode } from '../utils/affiliate-code';
 import {
   buildAuthenticatedUser,
@@ -45,15 +46,29 @@ export class PartnerService {
         affiliateCode: true,
         firstName: true,
         lastName: true,
+        fullLegalName: true,
+        dob: true,
+        avatarUrl: true,
         firmName: true,
         occupation: true,
+        otherOccupationName: true,
+        otherOccupationDescribe: true,
         mobileNumber: true,
         whatsappNumber: true,
         emailAddress: true,
         status: true,
         city: true,
         state: true,
+        pincode: true,
         communicationAddress: true,
+        permanentAddress: true,
+        permanentCity: true,
+        permanentState: true,
+        permanentPincode: true,
+        identityProofType: true,
+        aadharCardNumber: true,
+        panCardNumber: true,
+        preferredPaymentMethod: true,
         registrationUrl: true,
         rejectionReason: true,
         createdAt: true,
@@ -81,13 +96,34 @@ export class PartnerService {
           ownerName,
           firstName: affiliate.firstName,
           lastName: affiliate.lastName,
+          fullLegalName: affiliate.fullLegalName,
+          dob: affiliate.dob,
+          avatarUrl: affiliate.avatarUrl,
           contactPerson: occupationLabel,
+          occupation: occupationLabel,
+          firmName: affiliate.firmName,
+          otherOccupationName: affiliate.otherOccupationName,
+          otherOccupationDescribe: affiliate.otherOccupationDescribe,
           mobile: affiliate.mobileNumber,
           whatsapp: affiliate.whatsappNumber,
           email: affiliate.emailAddress,
           city: affiliate.city,
           state: affiliate.state,
+          pincode: affiliate.pincode,
+          communicationAddress: affiliate.communicationAddress,
           addressLine1: affiliate.communicationAddress,
+          permanentAddress: affiliate.permanentAddress,
+          permanentCity: affiliate.permanentCity,
+          permanentState: affiliate.permanentState,
+          permanentPincode: affiliate.permanentPincode,
+          identityProofType: affiliate.identityProofType,
+          aadharCardNumber: affiliate.aadharCardNumber,
+          panCardNumber: affiliate.panCardNumber,
+          preferredPaymentMethod: affiliate.preferredPaymentMethod,
+          bankAccountName: affiliate.bankAccountHolderName,
+          bankAccountNumber: affiliate.bankAccountNumber,
+          bankIfsc: affiliate.bankIfscNumber,
+          bankName: affiliate.bankName,
           status: affiliate.status,
           registrationUrl: '', // Hide referral link until approved
           rejectionReason: affiliate.rejectionReason,
@@ -944,6 +980,222 @@ export class PartnerService {
       user: sanitizedUser,
       accessToken,
       message: 'Affiliate application submitted successfully. Your profile is currently pending approval.'
+    };
+  }
+
+  /**
+   * Submit KYC Details (available when affiliate status is KYC_PENDING or KYC_REJECTED)
+   */
+  async submitKyc(partnerId: string, data: SubmitKycInput) {
+    const existing = await prisma.affiliate.findUnique({
+      where: { id: partnerId }
+    });
+
+    if (!existing) {
+      throw new AppError('Affiliate profile not found', 404, 'NOT_FOUND');
+    }
+
+    if (existing.status !== AffiliateStatus.KYC_PENDING && existing.status !== AffiliateStatus.KYC_REJECTED) {
+      throw new AppError(
+        `KYC submission is not allowed while your profile status is '${existing.status}'.`,
+        400,
+        'KYC_NOT_ALLOWED'
+      );
+    }
+
+    const prismaOccupation = toPrismaOccupation(data.occupation);
+    const educatorLocation =
+      data.educatorInstituteCity && data.educatorInstituteState
+        ? `${toCapitalCase(data.educatorInstituteCity)}, ${data.educatorInstituteState.trim()}`
+        : null;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      if (existing.userId) {
+        await tx.user.update({
+          where: { id: existing.userId },
+          data: {
+            avatarUrl: data.avatarUrl,
+            occupation: prismaOccupation,
+            communicationAddress: data.communicationAddress.trim()
+          }
+        });
+      }
+
+      return tx.affiliate.update({
+        where: { id: partnerId },
+        data: {
+          fullLegalName: data.fullLegalName,
+          dob: new Date(data.dob),
+          avatarUrl: data.avatarUrl,
+          permanentAddress: data.permanentAddress.trim(),
+          permanentCity: data.permanentCity,
+          permanentState: data.permanentState.trim(),
+          permanentPincode: data.permanentPincode.trim(),
+          communicationAddress: data.communicationAddress.trim(),
+          city: data.city,
+          state: data.state.trim(),
+          pincode: data.pincode.trim(),
+
+          identityProofType: data.identityProofType,
+          aadharCardNumber:
+            data.identityProofType === 'Aadhaar Card'
+              ? (data.aadharCardNumber || '').replace(/\s+/g, '') || null
+              : null,
+          aadharCardFrontUrl:
+            data.identityProofType === 'Aadhaar Card' ? data.aadharCardFrontUrl || null : null,
+          aadharCardBackUrl:
+            data.identityProofType === 'Aadhaar Card' ? data.aadharCardBackUrl || null : null,
+          panCardNumber: data.panCardNumber.toUpperCase(),
+          panCardFrontUrl: data.identityProofType === 'PAN Card' ? data.panCardFrontUrl || null : null,
+          panCardBackUrl: data.identityProofType === 'PAN Card' ? data.panCardBackUrl || null : null,
+
+          occupation: prismaOccupation,
+          firmName:
+            prismaOccupation === 'BUSINESS_OWNER' || prismaOccupation === 'CONSULTANT' || prismaOccupation === 'OTHER'
+              ? data.firmName?.trim() || existing.firmName || null
+              : null,
+          firmAddress:
+            prismaOccupation === 'BUSINESS_OWNER' || prismaOccupation === 'CONSULTANT'
+              ? data.firmAddress?.trim() || null
+              : null,
+          firmCity:
+            prismaOccupation === 'BUSINESS_OWNER' || prismaOccupation === 'CONSULTANT'
+              ? toCapitalCase(data.firmCity) || null
+              : null,
+          firmState:
+            prismaOccupation === 'BUSINESS_OWNER' || prismaOccupation === 'CONSULTANT'
+              ? data.firmState?.trim() || null
+              : null,
+          firmPincode:
+            prismaOccupation === 'BUSINESS_OWNER' || prismaOccupation === 'CONSULTANT'
+              ? data.firmPincode?.trim() || null
+              : null,
+          ownerBusinessType:
+            prismaOccupation === 'BUSINESS_OWNER' ? data.ownerBusinessType?.trim() || null : null,
+
+          studentCollegeName:
+            prismaOccupation === 'STUDENT' ? data.studentCollegeName?.trim() || null : null,
+          studentCollegeDegree:
+            prismaOccupation === 'STUDENT' ? data.studentCollegeDegree?.trim() || null : null,
+          studentCollegeYearSemester:
+            prismaOccupation === 'STUDENT' ? data.studentCollegeYearSemester?.trim() || null : null,
+          studentCollegeAddress:
+            prismaOccupation === 'STUDENT' ? data.studentCollegeAddress?.trim() || null : null,
+          studentCollegeCity:
+            prismaOccupation === 'STUDENT' ? toCapitalCase(data.studentCollegeCity) || null : null,
+          studentCollegeState:
+            prismaOccupation === 'STUDENT' ? data.studentCollegeState?.trim() || null : null,
+          studentCollegePincode:
+            prismaOccupation === 'STUDENT' ? data.studentCollegePincode?.trim() || null : null,
+
+          professionalCompanyName:
+            prismaOccupation === 'WORKING_PROFESSIONAL'
+              ? data.professionalCompanyName?.trim() || null
+              : null,
+          professionalJobTitle:
+            prismaOccupation === 'WORKING_PROFESSIONAL' ? data.professionalJobTitle?.trim() || null : null,
+          professionalCompanyAddress:
+            prismaOccupation === 'WORKING_PROFESSIONAL'
+              ? data.professionalCompanyAddress?.trim() || null
+              : null,
+          professionalCompanyCity:
+            prismaOccupation === 'WORKING_PROFESSIONAL'
+              ? toCapitalCase(data.professionalCompanyCity) || null
+              : null,
+          professionalCompanyState:
+            prismaOccupation === 'WORKING_PROFESSIONAL'
+              ? data.professionalCompanyState?.trim() || null
+              : null,
+          professionalCompanyPincode:
+            prismaOccupation === 'WORKING_PROFESSIONAL'
+              ? data.professionalCompanyPincode?.trim() || null
+              : null,
+
+          educatorInstituteType:
+            prismaOccupation === 'EDUCATOR' ? data.educatorInstituteType?.trim() || null : null,
+          educatorInstituteName:
+            prismaOccupation === 'EDUCATOR' ? data.educatorInstituteName?.trim() || null : null,
+          educatorDesignation:
+            prismaOccupation === 'EDUCATOR' ? data.educatorDesignation?.trim() || null : null,
+          educatorInstituteLocation: prismaOccupation === 'EDUCATOR' ? educatorLocation : null,
+          educatorInstituteAddress:
+            prismaOccupation === 'EDUCATOR' ? data.educatorInstituteAddress?.trim() || null : null,
+          educatorInstituteCity:
+            prismaOccupation === 'EDUCATOR' ? toCapitalCase(data.educatorInstituteCity) || null : null,
+          educatorInstituteState:
+            prismaOccupation === 'EDUCATOR' ? data.educatorInstituteState?.trim() || null : null,
+          educatorInstitutePincode:
+            prismaOccupation === 'EDUCATOR' ? data.educatorInstitutePincode?.trim() || null : null,
+
+          freelancerWorkCategory:
+            prismaOccupation === 'FREELANCER' ? data.freelancerWorkCategory?.trim() || null : null,
+          freelancerDescribeWork:
+            prismaOccupation === 'FREELANCER' ? data.freelancerDescribeWork?.trim() || null : null,
+
+          specifyOccupation:
+            prismaOccupation === 'OTHER' ? data.otherOccupationName?.trim() || null : null,
+          otherOccupationName:
+            prismaOccupation === 'OTHER' ? data.otherOccupationName?.trim() || null : null,
+          otherOccupationDescribe:
+            prismaOccupation === 'OTHER' ? data.otherOccupationDescribe?.trim() || null : null,
+          otherOccupationAddress:
+            prismaOccupation === 'OTHER' ? data.otherOccupationAddress?.trim() || null : null,
+          otherOccupationCity:
+            prismaOccupation === 'OTHER' ? toCapitalCase(data.otherOccupationCity) || null : null,
+          otherOccupationState:
+            prismaOccupation === 'OTHER' ? data.otherOccupationState?.trim() || null : null,
+          otherOccupationPincode:
+            prismaOccupation === 'OTHER' ? data.otherOccupationPincode?.trim() || null : null,
+
+          selfEmployedOccupationName:
+            prismaOccupation === 'SELF_EMPLOYED' ? data.selfEmployedOccupationName?.trim() || null : null,
+          selfEmployedOccupationDescribe:
+            prismaOccupation === 'SELF_EMPLOYED' ? data.selfEmployedOccupationDescribe?.trim() || null : null,
+          selfEmployedOccupationAddress:
+            prismaOccupation === 'SELF_EMPLOYED' ? data.selfEmployedOccupationAddress?.trim() || null : null,
+          selfEmployedOccupationCity:
+            prismaOccupation === 'SELF_EMPLOYED' ? toCapitalCase(data.selfEmployedOccupationCity) || null : null,
+          selfEmployedOccupationState:
+            prismaOccupation === 'SELF_EMPLOYED' ? data.selfEmployedOccupationState?.trim() || null : null,
+          selfEmployedOccupationPincode:
+            prismaOccupation === 'SELF_EMPLOYED' ? data.selfEmployedOccupationPincode?.trim() || null : null,
+
+          preferredPaymentMethod: data.preferredPaymentMethod || 'Bank Transfer',
+          bankAccountHolderName: data.bankAccountHolderName.trim(),
+          bankAccountNumber: data.bankAccountNumber.trim(),
+          bankIfscNumber: data.bankIfscNumber.toUpperCase(),
+          bankName: data.bankName.trim(),
+          bankProof: data.bankProof,
+
+          status: AffiliateStatus.KYC_REVISED,
+          rejectionReason: null
+        }
+      });
+    });
+
+    try {
+      const admins = await prisma.user.findMany({
+        where: { role: Role.ADMIN, isActive: true },
+        select: { id: true }
+      });
+      if (admins.length > 0) {
+        await prisma.notification.createMany({
+          data: admins.map((a) => ({
+            userId: a.id,
+            title: `KYC Submitted [${updated.affiliateCode}]`,
+            message: `${updated.fullLegalName || formatFullName(updated.firstName, updated.lastName)} submitted KYC documents for final approval.`,
+            actionUrl: `/admin/affiliate/${updated.id}`
+          }))
+        });
+      }
+    } catch (notifyErr) {
+      logger.warn('Could not notify admins on KYC submission:', notifyErr);
+    }
+
+    return {
+      id: updated.id,
+      affiliateCode: updated.affiliateCode,
+      status: updated.status
     };
   }
 }
