@@ -1,7 +1,10 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
+import { logger } from '../config/logger';
 import { AppError } from '../middlewares/error.middleware';
 import { hashPassword } from '../utils/password';
+import { whatsappOtpService } from './whatsapp-otp.service';
+import { emailOtpService } from './email-otp.service';
 import {
   Role,
   AffiliateStatus,
@@ -516,6 +519,31 @@ export class AdminService {
           rejectionReason
         }
       });
+
+      const emailLower = (updated.emailAddress || '').trim().toLowerCase();
+      const isSyntheticTestEmail =
+        env.NODE_ENV !== 'production' &&
+        env.ALLOW_TEST_OTP_BYPASS &&
+        (emailLower.endsWith('@test.iotaacademy.in') || emailLower.endsWith('@example.com'));
+
+      if (!isSyntheticTestEmail) {
+        whatsappOtpService
+          .sendAffiliateRejectionWhatsApp(updated.whatsappNumber || updated.mobileNumber, updated.firstName)
+          .catch((waErr) => {
+            logger.warn('[WhatsApp Rejection Message] Dispatch warning:', waErr);
+          });
+
+        if (emailLower) {
+          emailOtpService
+            .sendAffiliateRejectionEmail(emailLower, updated.firstName)
+            .catch((mailErr) => {
+              logger.warn('[Email Rejection Message] Dispatch warning:', mailErr);
+            });
+        }
+      } else {
+        logger.info(`[Test Mode] Skipped external WhatsApp/Email rejection dispatch for ${emailLower}`);
+      }
+
       return mapAffiliateRow(updated);
     }
 

@@ -634,69 +634,49 @@ export class WhatsAppOtpService {
   }
 
   /**
-   * Dispatch Registration Confirmation message via Meta WhatsApp template "affiliate_registration_done"
+   * Shared helper to dispatch a 1-parameter ({{1}} = first name) Meta WhatsApp template
    */
-  public async sendAffiliateRegistrationWhatsApp(
+  private async sendAffiliateTemplateWhatsApp(
     phone: string,
-    affiliateName: string
+    templateName: string,
+    affiliateName: string,
+    contextLabel: string
   ): Promise<{ ok: boolean; messageId?: string; error?: string }> {
     const cleanPhone = this.normalizePhone(phone);
-    // Use only first name with Capital Case (e.g. "Hi Arvind" not "Hi Arvind Vishwakarma")
+    // Use only first name with Capital Case (e.g. "Hi Arvind")
     const rawFirst = (affiliateName || 'Partner').trim().split(/\s+/)[0] || 'Partner';
     const firstName = rawFirst.charAt(0).toUpperCase() + rawFirst.slice(1).toLowerCase();
 
     const { waToken, waPhoneId } = this.getCredentials();
 
     if (!waToken || !waPhoneId) {
-      logger.info(`[WhatsApp API] Credentials missing. Simulated registration WhatsApp message to +91${cleanPhone} for ${firstName}.`);
+      logger.info(`[WhatsApp API] Credentials missing. Simulated ${contextLabel} WhatsApp (${templateName}) to +91${cleanPhone} for ${firstName}.`);
       return { ok: false, error: 'Credentials not configured' };
     }
 
     const recipientWithCountry = `91${cleanPhone}`;
     const url = `https://graph.facebook.com/v20.0/${waPhoneId}/messages`;
-    const templateName = 'affiliate_registration_done';
 
     // Try candidates: en first (matching Meta configuration), then en_US
-    const candidates = [
-      {
-        desc: 'affiliate_registration_done (en)',
-        payload: {
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: recipientWithCountry,
-          type: 'template',
-          template: {
-            name: templateName,
-            language: { code: 'en' },
-            components: [
-              {
-                type: 'body',
-                parameters: [{ type: 'text', text: firstName }]
-              }
-            ]
-          }
-        }
-      },
-      {
-        desc: 'affiliate_registration_done (en_US)',
-        payload: {
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: recipientWithCountry,
-          type: 'template',
-          template: {
-            name: templateName,
-            language: { code: 'en_US' },
-            components: [
-              {
-                type: 'body',
-                parameters: [{ type: 'text', text: firstName }]
-              }
-            ]
-          }
+    const candidates = ['en', 'en_US'].map((langCode) => ({
+      desc: `${templateName} (${langCode})`,
+      payload: {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: recipientWithCountry,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: langCode },
+          components: [
+            {
+              type: 'body',
+              parameters: [{ type: 'text', text: firstName }]
+            }
+          ]
         }
       }
-    ];
+    }));
 
     for (const candidate of candidates) {
       try {
@@ -712,7 +692,7 @@ export class WhatsAppOtpService {
         const data: any = await response.json();
         if (response.ok && data?.messages?.[0]?.id) {
           const msgId = data.messages[0].id;
-          logger.info(`[WhatsApp API Success] Registration confirmation sent via template '${templateName}' to +91${cleanPhone}. ID: ${msgId}`);
+          logger.info(`[WhatsApp API Success] ${contextLabel} sent via template '${templateName}' to +91${cleanPhone}. ID: ${msgId}`);
           return { ok: true, messageId: msgId };
         } else {
           logger.warn(`[WhatsApp API] Template candidate ${candidate.desc} response:`, data?.error?.message || data);
@@ -722,7 +702,37 @@ export class WhatsAppOtpService {
       }
     }
 
-    return { ok: false, error: 'Failed to deliver WhatsApp registration template' };
+    return { ok: false, error: `Failed to deliver WhatsApp template '${templateName}'` };
+  }
+
+  /**
+   * Dispatch Registration Confirmation message via Meta WhatsApp template "affiliate_registration_done"
+   */
+  public async sendAffiliateRegistrationWhatsApp(
+    phone: string,
+    affiliateName: string
+  ): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+    return this.sendAffiliateTemplateWhatsApp(
+      phone,
+      'affiliate_registration_done',
+      affiliateName,
+      'Registration confirmation'
+    );
+  }
+
+  /**
+   * Dispatch Profile Rejection notification via Meta WhatsApp template "affiliate_profile_rejected"
+   */
+  public async sendAffiliateRejectionWhatsApp(
+    phone: string,
+    affiliateName: string
+  ): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+    return this.sendAffiliateTemplateWhatsApp(
+      phone,
+      'affiliate_profile_rejected',
+      affiliateName,
+      'Profile rejection'
+    );
   }
 }
 

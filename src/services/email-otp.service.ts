@@ -627,6 +627,90 @@ WhatsApp: +91 89625 45150`;
 
     return this.sendCustomEmail(cleanEmail, subject, textBody, htmlBody);
   }
+
+  /**
+   * Send Profile Rejection notification email to an affiliate
+   */
+  public async sendAffiliateRejectionEmail(toEmail: string, affiliateName: string): Promise<boolean> {
+    const cleanEmail = this.normalizeEmail(toEmail);
+    const rawFirst = (affiliateName || 'Partner').trim().split(/\s+/)[0] || 'Partner';
+    const firstName = rawFirst.charAt(0).toUpperCase() + rawFirst.slice(1).toLowerCase();
+
+    const subject = 'Update on your IOTA Academy Affiliate Program application';
+
+    const textBody = `Hi ${firstName},
+After reviewing your registration details, we regret to inform you that your affiliate profile has been rejected.
+To understand the reason for rejection, please log in to your affiliate profile using the link below:
+Login to Your Affiliate Profile:
+https://affiliate.iotaacademy.in/login
+You can view the rejection reason and related details directly in your profile.
+For any clarification or assistance, please contact us at affiliate@iotaacademy.in
+Thank you for your interest in joining the IOTA Academy Affiliate Program.
+Regards,
+Affiliate Program Team
+IOTA Academy
+affiliate@iotaacademy.in
+https://www.iotaacademy.in`;
+
+    const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>IOTA Academy Affiliate Program</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="100%" style="max-width: 580px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
+          <tr>
+            <td style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); padding: 32px 30px; text-align: center;">
+              <h1 style="color: #ffffff; font-size: 22px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">IOTA ACADEMY</h1>
+              <p style="color: #bfdbfe; font-size: 13px; margin: 6px 0 0; font-weight: 500;">Affiliate Program</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 36px 32px; color: #1e293b; font-size: 14px; line-height: 1.65;">
+              <p style="margin: 0 0 16px; font-size: 16px; font-weight: 700; color: #0f172a;">Hi ${firstName},</p>
+              <p style="margin: 0 0 16px;">After reviewing your registration details, we regret to inform you that your affiliate profile has been rejected.</p>
+              <p style="margin: 0 0 12px;">To understand the reason for rejection, please log in to your affiliate profile using the link below:</p>
+              <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; border-radius: 8px; padding: 16px 20px; margin: 0 0 20px;">
+                <p style="margin: 0 0 8px; font-weight: 700; color: #7f1d1d;">Login to Your Affiliate Profile:</p>
+                <p style="margin: 0;"><a href="https://affiliate.iotaacademy.in/login" style="color: #2563eb; font-weight: 600; text-decoration: none;" target="_blank">https://affiliate.iotaacademy.in/login</a></p>
+              </div>
+              <p style="margin: 0 0 16px;">You can view the rejection reason and related details directly in your profile.</p>
+              <p style="margin: 0 0 16px;">For any clarification or assistance, please contact us at <a href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></p>
+              <p style="margin: 0 0 24px;">Thank you for your interest in joining the IOTA Academy Affiliate Program.</p>
+              <p style="margin: 0 0 4px; font-weight: 600;">Regards,</p>
+              <p style="margin: 0 0 2px; font-weight: 700; color: #1e3a8a;">Affiliate Program Team</p>
+              <p style="margin: 0 0 16px; font-weight: 600; color: #334155;">IOTA Academy</p>
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
+                <tr>
+                  <td style="padding: 3px 0;"><a href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
+                </tr>
+                <tr>
+                  <td style="padding: 3px 0;"><a href="https://www.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://www.iotaacademy.in</a></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="color: #94a3b8; font-size: 11px; margin: 0;">© 2026 TECHIOTA LLP (IOTA Academy). All rights reserved.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `.trim();
+
+    return this.sendCustomEmail(cleanEmail, subject, textBody, htmlBody);
+  }
 }
 
 export const emailOtpService = new EmailOtpService();
