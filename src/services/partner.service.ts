@@ -33,6 +33,7 @@ import {
 import { RequestWithdrawalInput } from '../validators/settlement.validator';
 import { whatsappOtpService } from './whatsapp-otp.service';
 import { emailOtpService } from './email-otp.service';
+import { cloudinaryService } from './cloudinary.service';
 
 export class PartnerService {
   /**
@@ -67,8 +68,13 @@ export class PartnerService {
         permanentPincode: true,
         identityProofType: true,
         aadharCardNumber: true,
+        aadharCardFrontUrl: true,
+        aadharCardBackUrl: true,
         panCardNumber: true,
+        panCardFrontUrl: true,
+        panCardBackUrl: true,
         preferredPaymentMethod: true,
+        bankProof: true,
         registrationUrl: true,
         rejectionReason: true,
         createdAt: true,
@@ -118,8 +124,13 @@ export class PartnerService {
           permanentPincode: affiliate.permanentPincode,
           identityProofType: affiliate.identityProofType,
           aadharCardNumber: affiliate.aadharCardNumber,
+          aadharCardFrontUrl: affiliate.aadharCardFrontUrl,
+          aadharCardBackUrl: affiliate.aadharCardBackUrl,
           panCardNumber: affiliate.panCardNumber,
+          panCardFrontUrl: affiliate.panCardFrontUrl,
+          panCardBackUrl: affiliate.panCardBackUrl,
           preferredPaymentMethod: affiliate.preferredPaymentMethod,
+          bankProof: affiliate.bankProof,
           bankAccountName: affiliate.bankAccountHolderName,
           bankAccountNumber: affiliate.bankAccountNumber,
           bankIfsc: affiliate.bankIfscNumber,
@@ -1009,12 +1020,38 @@ export class PartnerService {
         ? `${toCapitalCase(data.educatorInstituteCity)}, ${data.educatorInstituteState.trim()}`
         : null;
 
+    // Upload KYC images to Cloudinary and store permanent HTTPS secure_urls
+    const code = existing.affiliateCode;
+    const [
+      avatarCloudUrl,
+      aadharFrontCloudUrl,
+      aadharBackCloudUrl,
+      panFrontCloudUrl,
+      panBackCloudUrl,
+      bankProofCloudUrl
+    ] = await Promise.all([
+      cloudinaryService.uploadImage(data.avatarUrl, 'iota-affiliates/profile-pictures', `${code}-avatar`),
+      data.identityProofType === 'Aadhaar Card' && data.aadharCardFrontUrl
+        ? cloudinaryService.uploadImage(data.aadharCardFrontUrl, 'iota-affiliates/identity-docs', `${code}-aadhar-front`)
+        : Promise.resolve(null),
+      data.identityProofType === 'Aadhaar Card' && data.aadharCardBackUrl
+        ? cloudinaryService.uploadImage(data.aadharCardBackUrl, 'iota-affiliates/identity-docs', `${code}-aadhar-back`)
+        : Promise.resolve(null),
+      data.identityProofType === 'PAN Card' && data.panCardFrontUrl
+        ? cloudinaryService.uploadImage(data.panCardFrontUrl, 'iota-affiliates/identity-docs', `${code}-pan-front`)
+        : Promise.resolve(null),
+      data.identityProofType === 'PAN Card' && data.panCardBackUrl
+        ? cloudinaryService.uploadImage(data.panCardBackUrl, 'iota-affiliates/identity-docs', `${code}-pan-back`)
+        : Promise.resolve(null),
+      cloudinaryService.uploadImage(data.bankProof, 'iota-affiliates/bank-proofs', `${code}-bank-proof`)
+    ]);
+
     const updated = await prisma.$transaction(async (tx) => {
       if (existing.userId) {
         await tx.user.update({
           where: { id: existing.userId },
           data: {
-            avatarUrl: data.avatarUrl,
+            avatarUrl: avatarCloudUrl,
             occupation: prismaOccupation,
             communicationAddress: data.communicationAddress.trim()
           }
@@ -1026,7 +1063,7 @@ export class PartnerService {
         data: {
           fullLegalName: data.fullLegalName,
           dob: new Date(data.dob),
-          avatarUrl: data.avatarUrl,
+          avatarUrl: avatarCloudUrl,
           permanentAddress: data.permanentAddress.trim(),
           permanentCity: data.permanentCity,
           permanentState: data.permanentState.trim(),
@@ -1041,13 +1078,11 @@ export class PartnerService {
             data.identityProofType === 'Aadhaar Card'
               ? (data.aadharCardNumber || '').replace(/\s+/g, '') || null
               : null,
-          aadharCardFrontUrl:
-            data.identityProofType === 'Aadhaar Card' ? data.aadharCardFrontUrl || null : null,
-          aadharCardBackUrl:
-            data.identityProofType === 'Aadhaar Card' ? data.aadharCardBackUrl || null : null,
+          aadharCardFrontUrl: aadharFrontCloudUrl,
+          aadharCardBackUrl: aadharBackCloudUrl,
           panCardNumber: data.panCardNumber.toUpperCase(),
-          panCardFrontUrl: data.identityProofType === 'PAN Card' ? data.panCardFrontUrl || null : null,
-          panCardBackUrl: data.identityProofType === 'PAN Card' ? data.panCardBackUrl || null : null,
+          panCardFrontUrl: panFrontCloudUrl,
+          panCardBackUrl: panBackCloudUrl,
 
           occupation: prismaOccupation,
           firmName:
@@ -1165,9 +1200,12 @@ export class PartnerService {
           bankAccountNumber: data.bankAccountNumber.trim(),
           bankIfscNumber: data.bankIfscNumber.toUpperCase(),
           bankName: data.bankName.trim(),
-          bankProof: data.bankProof,
+          bankProof: bankProofCloudUrl,
 
-          status: AffiliateStatus.KYC_REVISED,
+          status:
+            existing.status === AffiliateStatus.KYC_REJECTED
+              ? AffiliateStatus.KYC_REVISED
+              : AffiliateStatus.KYC_SUBMITTED,
           rejectionReason: null
         }
       });

@@ -38,6 +38,7 @@ export const partnerApprovalSchema = z.object({
     AffiliateStatus.ACTIVE,
     AffiliateStatus.PROFILE_REJECTED,
     AffiliateStatus.KYC_PENDING,
+    AffiliateStatus.KYC_SUBMITTED,
     AffiliateStatus.KYC_REJECTED,
     AffiliateStatus.KYC_REVISED,
     AffiliateStatus.SUSPENDED,

@@ -31,8 +31,11 @@ const envSchema = z.object({
   EMAIL_PASSWORD: z.string().optional().default(''),
   EMAIL_FROM: z.string().optional().default('IOTA Academy <noreply@iotaacademy.in>'),
 
-  FILE_STORAGE_PROVIDER: z.enum(['local', 's3', 'r2']).default('local'),
+  FILE_STORAGE_PROVIDER: z.enum(['local', 's3', 'r2', 'cloudinary']).default('cloudinary'),
   UPLOAD_DIR: z.string().default('./uploads'),
+  CLOUDINARY_CLOUD_NAME: z.string().optional().default(''),
+  CLOUDINARY_API_KEY: z.string().optional().default(''),
+  CLOUDINARY_API_SECRET: z.string().optional().default(''),
   ALLOW_TEST_OTP_BYPASS: z
     .string()
     .optional()
