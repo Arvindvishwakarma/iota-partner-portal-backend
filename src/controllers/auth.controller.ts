@@ -106,6 +106,88 @@ export class AuthController {
       next(err);
     }
   }
+
+  async forgotPasswordSendEmailCode(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.forgotPasswordSendEmailCode(req.body.email);
+      return res.status(200).json({
+        success: true,
+        data: result,
+        message: 'Verification code sent to your registered email address.'
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async forgotPasswordVerifyEmailCode(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.forgotPasswordVerifyEmailCode(req.body.email, req.body.code);
+      return res.status(200).json({
+        success: true,
+        data: result,
+        message: 'Email code verified successfully.'
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async forgotPasswordResetByEmail(req: Request, res: Response, next: NextFunction) {
+    try {
+      await authService.forgotPasswordResetByEmail(req.body.email, req.body.resetToken, req.body.newPassword);
+      return res.status(200).json({
+        success: true,
+        data: null,
+        message: 'Password has been reset successfully. Please login with your new password.'
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async forgotPasswordSendWhatsappOtp(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.forgotPasswordSendWhatsappOtp(req.body.mobile);
+      return res.status(200).json({
+        success: true,
+        data: result,
+        message: 'Verification OTP sent to your registered WhatsApp number.'
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async forgotPasswordVerifyWhatsappOtp(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.forgotPasswordVerifyWhatsappOtp(
+        req.body.mobile,
+        req.body.otp,
+        req.body.otpSessionId
+      );
+      return res.status(200).json({
+        success: true,
+        data: result,
+        message: 'WhatsApp OTP verified successfully.'
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async forgotPasswordResetByWhatsapp(req: Request, res: Response, next: NextFunction) {
+    try {
+      await authService.forgotPasswordResetByWhatsapp(req.body.mobile, req.body.resetToken, req.body.newPassword);
+      return res.status(200).json({
+        success: true,
+        data: null,
+        message: 'Password has been reset successfully. Please login with your new password.'
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const authController = new AuthController();

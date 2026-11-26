@@ -18,6 +18,13 @@ interface StoredEmailOtp {
   verifiedAt?: number;
 }
 
+export interface EmailOtpContext {
+  title?: string;
+  heading?: string;
+  description?: string;
+  subject?: string;
+}
+
 export class EmailOtpService {
   private otpStore = new Map<string, StoredEmailOtp>();
 
@@ -123,7 +130,7 @@ export class EmailOtpService {
   /**
    * Send Email OTP via SMTP (supports nodemailer or native socket SMTP)
    */
-  private async dispatchSmtp(toEmail: string, otp: string): Promise<boolean> {
+  private async dispatchSmtp(toEmail: string, otp: string, context?: EmailOtpContext): Promise<boolean> {
     const { host, port, secure, user, pass, from } = this.getCredentials();
 
     if (!host || !user || !pass || host === 'smtp.example.com') {
@@ -138,12 +145,19 @@ export class EmailOtpService {
       return false;
     }
 
+    const emailTitle = context?.title || 'IOTA Academy Partner Verification';
+    const emailHeading = context?.heading || 'Verify Your Email Address';
+    const emailDesc =
+      context?.description ||
+      'Thank you for applying to the IOTA Academy Affiliate Program. Please use the verification code below to verify your email address:';
+    const emailSubject = context?.subject || `${otp} is your IOTA Academy Partner verification code`;
+
     const htmlBody = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>IOTA Academy Partner Verification</title>
+  <title>${emailTitle}</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
   <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 20px;">
@@ -154,15 +168,15 @@ export class EmailOtpService {
           <tr>
             <td style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); padding: 32px 30px; text-align: center;">
               <h1 style="color: #ffffff; font-size: 22px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">IOTA ACADEMY</h1>
-              <p style="color: #bfdbfe; font-size: 13px; margin: 6px 0 0; font-weight: 500;">Affiliate Program Registration</p>
+              <p style="color: #bfdbfe; font-size: 13px; margin: 6px 0 0; font-weight: 500;">Affiliate Program</p>
             </td>
           </tr>
           <!-- Body -->
           <tr>
             <td style="padding: 36px 32px;">
-              <h2 style="color: #0f172a; font-size: 18px; margin: 0 0 12px; font-weight: 700;">Verify Your Email Address</h2>
+              <h2 style="color: #0f172a; font-size: 18px; margin: 0 0 12px; font-weight: 700;">${emailHeading}</h2>
               <p style="color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 24px;">
-                Thank you for applying to the IOTA Academy Affiliate Program. Please use the verification code below to verify your email address:
+                ${emailDesc}
               </p>
               
               <!-- OTP Box -->
@@ -171,7 +185,7 @@ export class EmailOtpService {
               </div>
 
               <p style="color: #64748b; font-size: 13px; line-height: 1.5; margin: 0 0 8px;">
-                ⏳ This OTP is valid for <strong>10 minutes</strong>.
+                ⏳ This code is valid for <strong>10 minutes</strong>.
               </p>
               <p style="color: #94a3b8; font-size: 12px; line-height: 1.5; margin: 0;">
                 If you did not request this verification, please safely ignore this email.
@@ -214,8 +228,8 @@ export class EmailOtpService {
       const info = await transporter.sendMail({
         from,
         to: toEmail,
-        subject: `${otp} is your IOTA Academy Partner verification code`,
-        text: `Your IOTA Academy Partner verification code is: ${otp} (valid for 10 minutes).`,
+        subject: emailSubject,
+        text: `Your IOTA Academy verification code is: ${otp} (valid for 10 minutes).`,
         html: htmlBody
       });
 
@@ -356,7 +370,10 @@ export class EmailOtpService {
   /**
    * Send Email OTP
    */
-  async sendOtp(rawEmail: string): Promise<{ success: boolean; message: string; cooldown: number; debugOtp?: string }> {
+  async sendOtp(
+    rawEmail: string,
+    context?: EmailOtpContext
+  ): Promise<{ success: boolean; message: string; cooldown: number; expiresInSeconds: number; debugOtp?: string }> {
     const cleanEmail = this.normalizeEmail(rawEmail);
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(cleanEmail)) {
@@ -369,7 +386,7 @@ export class EmailOtpService {
     if (existing && now - existing.lastSentAt < this.RESEND_COOLDOWN_SECONDS * 1000) {
       const remainingSeconds = Math.ceil((this.RESEND_COOLDOWN_SECONDS * 1000 - (now - existing.lastSentAt)) / 1000);
       throw new AppError(
-        `Please wait ${remainingSeconds} seconds before requesting a new email OTP.`,
+        `Please wait ${remainingSeconds} seconds before requesting a new verification code.`,
         429,
         'EMAIL_OTP_COOLDOWN'
       );
@@ -388,7 +405,7 @@ export class EmailOtpService {
 
     let sent = false;
     try {
-      sent = await this.dispatchSmtp(cleanEmail, otp);
+      sent = await this.dispatchSmtp(cleanEmail, otp, context);
     } catch (e: any) {
       const creds = this.getCredentials();
       const isConfigured = Boolean(creds.host && creds.user && creds.pass && creds.host !== 'smtp.example.com');
@@ -405,6 +422,7 @@ export class EmailOtpService {
       success: true,
       message: `A 6-digit verification code has been sent to ${cleanEmail}.`,
       cooldown: this.RESEND_COOLDOWN_SECONDS,
+      expiresInSeconds: Math.floor(this.OTP_EXPIRY_MS / 1000),
       debugOtp: isDev ? otp : undefined
     };
   }
