@@ -101,8 +101,8 @@ export class AdminController {
   async reviewPartner(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const { status, rejectionReason } = req.body;
-      const updated = await adminService.reviewPartner(id, status, rejectionReason);
+      const { status, rejectionReason, kycRevisionRemark } = req.body;
+      const updated = await adminService.reviewPartner(id, status, rejectionReason, kycRevisionRemark);
       res.status(200).json({
         success: true,
         data: updated,

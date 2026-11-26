@@ -52,6 +52,7 @@ export class PartnerService {
         avatarUrl: true,
         firmName: true,
         occupation: true,
+        influencerLinks: true,
         otherOccupationName: true,
         otherOccupationDescribe: true,
         mobileNumber: true,
@@ -77,6 +78,7 @@ export class PartnerService {
         bankProof: true,
         registrationUrl: true,
         rejectionReason: true,
+        kycRevisionRemark: true,
         createdAt: true,
         bankAccountHolderName: true,
         bankAccountNumber: true,
@@ -107,6 +109,7 @@ export class PartnerService {
           avatarUrl: affiliate.avatarUrl,
           contactPerson: occupationLabel,
           occupation: occupationLabel,
+          influencerLinks: Array.isArray(affiliate.influencerLinks) ? affiliate.influencerLinks : [],
           firmName: affiliate.firmName,
           otherOccupationName: affiliate.otherOccupationName,
           otherOccupationDescribe: affiliate.otherOccupationDescribe,
@@ -138,6 +141,7 @@ export class PartnerService {
           status: affiliate.status,
           registrationUrl: '', // Hide referral link until approved
           rejectionReason: affiliate.rejectionReason,
+          kycRevisionRemark: affiliate.kycRevisionRemark,
           createdAt: affiliate.createdAt
         },
         metrics: {
@@ -1194,6 +1198,12 @@ export class PartnerService {
             prismaOccupation === 'SELF_EMPLOYED' ? data.selfEmployedOccupationState?.trim() || null : null,
           selfEmployedOccupationPincode:
             prismaOccupation === 'SELF_EMPLOYED' ? data.selfEmployedOccupationPincode?.trim() || null : null,
+
+          ...(prismaOccupation === 'INFLUENCER'
+            ? {
+                influencerLinks: (data.influencerLinks || []).map((l) => l.trim()).filter(Boolean)
+              }
+            : {}),
 
           preferredPaymentMethod: data.preferredPaymentMethod || 'Bank Transfer',
           bankAccountHolderName: data.bankAccountHolderName.trim(),

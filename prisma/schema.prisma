@@ -244,6 +244,7 @@ model Affiliate {
   registrationUrl            String           @map("registration_url")
   qrCodeUrl                  String?          @map("qr_code_url")
   rejectionReason            String?          @map("rejection_reason")
+  kycRevisionRemark          String?          @map("kyc_revision_remark") @db.Text
   approvedAt                 DateTime?        @map("approved_at")
 
   firstName                  String           @map("first_name") @db.VarChar(60)

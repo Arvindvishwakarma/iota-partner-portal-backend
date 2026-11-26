@@ -470,7 +470,12 @@ export class AdminService {
     return mapAffiliateRow(partner);
   }
 
-  async reviewPartner(partnerId: string, status: AffiliateStatus, rejectionReason?: string) {
+  async reviewPartner(
+    partnerId: string,
+    status: AffiliateStatus,
+    rejectionReason?: string,
+    kycRevisionRemark?: string
+  ) {
     const partner = await prisma.affiliate.findUnique({
       where: { id: partnerId }
     });
@@ -501,14 +506,30 @@ export class AdminService {
             affiliateCode,
             registrationUrl,
             approvedAt: new Date(),
-            rejectionReason: null
+            rejectionReason: null,
+            kycRevisionRemark: null
           }
         });
       });
 
       return mapAffiliateRow(updated);
-    } else if (status === AffiliateStatus.PROFILE_REJECTED || status === AffiliateStatus.KYC_REJECTED) {
-      if (!rejectionReason) {
+    } else if (status === AffiliateStatus.KYC_REJECTED) {
+      const remark = (kycRevisionRemark || rejectionReason || '').trim();
+      if (!remark) {
+        throw new AppError('KYC revision remark is required', 400, 'MISSING_REJECTION_REASON');
+      }
+
+      const updated = await prisma.affiliate.update({
+        where: { id: partnerId },
+        data: {
+          status: AffiliateStatus.KYC_REJECTED,
+          kycRevisionRemark: remark
+        }
+      });
+
+      return mapAffiliateRow(updated);
+    } else if (status === AffiliateStatus.PROFILE_REJECTED) {
+      if (!rejectionReason?.trim()) {
         throw new AppError('Rejection reason is required', 400, 'MISSING_REJECTION_REASON');
       }
 
@@ -516,7 +537,7 @@ export class AdminService {
         where: { id: partnerId },
         data: {
           status,
-          rejectionReason
+          rejectionReason: rejectionReason.trim()
         }
       });
 

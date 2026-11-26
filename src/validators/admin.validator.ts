@@ -44,18 +44,23 @@ export const partnerApprovalSchema = z.object({
     AffiliateStatus.SUSPENDED,
     AffiliateStatus.INACTIVE
   ]),
-  rejectionReason: z.string().optional()
+  rejectionReason: z.string().optional(),
+  kycRevisionRemark: z.string().optional()
 }).refine(
   (data) => {
+    if (data.status === AffiliateStatus.PROFILE_REJECTED && !data.rejectionReason?.trim()) {
+      return false;
+    }
     if (
-      (data.status === AffiliateStatus.PROFILE_REJECTED || data.status === AffiliateStatus.KYC_REJECTED) &&
-      !data.rejectionReason
+      data.status === AffiliateStatus.KYC_REJECTED &&
+      !data.kycRevisionRemark?.trim() &&
+      !data.rejectionReason?.trim()
     ) {
       return false;
     }
     return true;
   },
-  { message: 'Rejection reason is mandatory when rejecting an affiliate application', path: ['rejectionReason'] }
+  { message: 'Remark is mandatory when rejecting an affiliate or requesting KYC revision', path: ['rejectionReason'] }
 );
 
 // Premises Schema

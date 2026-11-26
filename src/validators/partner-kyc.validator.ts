@@ -146,6 +146,8 @@ export const submitKycSchema = z
     selfEmployedOccupationState: z.string().trim().max(80).optional().nullable(),
     selfEmployedOccupationPincode: z.string().trim().optional().nullable(),
 
+    influencerLinks: z.array(z.string().trim().max(500)).optional().nullable(),
+
     // 4. Bank & Payout Details
     preferredPaymentMethod: z.string().trim().min(1).max(30).default('Bank Transfer'),
     bankAccountHolderName: z
@@ -276,7 +278,18 @@ export const submitKycSchema = z
         reqPin(data.selfEmployedOccupationPincode, 'selfEmployedOccupationPincode', 'Occupation Pincode');
         break;
 
-      case Occupation.INFLUENCER:
+      case Occupation.INFLUENCER: {
+        const cleanLinks = (data.influencerLinks || []).map((l) => l.trim()).filter(Boolean);
+        if (cleanLinks.length === 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['influencerLinks'],
+            message: 'Please provide at least one social media or profile link'
+          });
+        }
+        break;
+      }
+
       default:
         break;
     }
