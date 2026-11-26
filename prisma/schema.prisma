@@ -123,6 +123,11 @@ enum LeadActivityType {
   NOTE_ADDED
   PHONE_CALL
   WHATSAPP_MESSAGE
+  SMS
+  EMAIL
+  IN_PERSON_MEETING
+  DEMO_INTERACTION
+  OTHER
   OFFICE_VISIT_SCHEDULED
   DEMO_SCHEDULED
   COUNSELLOR_ASSIGNED
@@ -437,10 +442,18 @@ model Lead {
   whatsapp             String?          @map("whatsapp")
   currentEducation     String?          @map("current_education")
   city                 String           @map("city")
-  area                 String?          @map("area")
   preferredContactTime String?          @map("preferred_contact_time")
+  preferredLearningMode String?         @map("preferred_learning_mode") @db.VarChar(30)
   communicationConsent Boolean          @default(true) @map("communication_consent")
+  consentAt            DateTime?        @map("consent_at")
+  consentVersion       String?          @map("consent_version") @db.VarChar(30)
+  whatsappOtpVerified  Boolean          @default(false) @map("whatsapp_otp_verified")
   status               LeadStatus       @default(NEW)
+  currentMainStatus    String?          @map("current_main_status") @db.VarChar(60)
+  currentSubStatus     String?          @map("current_sub_status") @db.VarChar(80)
+  lastStatusRemark     String?          @map("last_status_remark") @db.Text
+  lastStatusUpdatedAt  DateTime?        @map("last_status_updated_at")
+  lastStatusUpdatedById String?         @map("last_status_updated_by_id")
   currentCounsellorId  String?          @map("current_counsellor_id")
   lastActivityAt       DateTime?        @map("last_activity_at")
   lastActivityById     String?          @map("last_activity_by_id")
@@ -458,7 +471,7 @@ model Lead {
   @@index([partnerId, status])
   @@index([currentCounsellorId, status])
   @@index([status, createdAt])
-  @@map("leads")
+  @@map("referrals")
 }
 
 model DuplicateLeadSubmission {
@@ -495,15 +508,20 @@ model LeadAssignment {
 }
 
 model LeadActivity {
-  id              String            @id @default(uuid())
-  leadId          String            @map("lead_id")
-  userId          String            @map("user_id")
-  activityType    LeadActivityType  @map("activity_type")
-  previousStatus  LeadStatus?       @map("previous_status")
-  newStatus       LeadStatus?       @map("new_status")
-  remarks         String?
-  scheduledFor    DateTime?         @map("scheduled_for")
-  createdAt       DateTime          @default(now()) @map("created_at")
+  id                 String            @id @default(uuid())
+  leadId             String            @map("lead_id")
+  userId             String            @map("user_id")
+  activityType       LeadActivityType  @map("activity_type")
+  previousStatus     LeadStatus?       @map("previous_status")
+  newStatus          LeadStatus?       @map("new_status")
+  previousMainStatus String?           @map("previous_main_status") @db.VarChar(60)
+  previousSubStatus  String?           @map("previous_sub_status") @db.VarChar(80)
+  newMainStatus      String?           @map("new_main_status") @db.VarChar(60)
+  newSubStatus       String?           @map("new_sub_status") @db.VarChar(80)
+  remarks            String?
+  metadata           Json?
+  scheduledFor       DateTime?         @map("scheduled_for")
+  createdAt          DateTime          @default(now()) @map("created_at")
 
   lead            Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
   user            User              @relation(fields: [userId], references: [id], onDelete: Restrict)

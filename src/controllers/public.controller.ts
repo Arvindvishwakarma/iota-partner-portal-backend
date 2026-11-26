@@ -9,8 +9,9 @@ export class PublicController {
   async verifyPartner(req: Request, res: Response, next: NextFunction) {
     try {
       const { partnerCode } = req.params;
-      const partner = await leadService.verifyPartnerCode(partnerCode);
-      res.status(200).json({ success: true, data: partner });
+      await leadService.verifyPartnerCode(partnerCode);
+      // Do not expose affiliate/partner identity or attribution details to student-facing clients
+      res.status(200).json({ success: true, data: { valid: true } });
     } catch (err) {
       next(err);
     }
@@ -20,6 +21,16 @@ export class PublicController {
     try {
       const courses = await leadService.getActiveCourses();
       res.status(200).json({ success: true, data: courses });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async checkDuplicateLeadPhone(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { mobile, whatsapp } = req.body || {};
+      const result = await leadService.checkDuplicatePhone(mobile, whatsapp);
+      res.status(200).json({ success: true, data: result });
     } catch (err) {
       next(err);
     }
@@ -53,13 +64,13 @@ export class PublicController {
 
   async sendWhatsAppOtp(req: Request, res: Response, next: NextFunction) {
     try {
-      const { phone } = req.body;
-      const result = await whatsappOtpService.sendOtp(phone);
+      const { phone, sessionId } = req.body;
+      const result = await whatsappOtpService.sendOtp(phone, sessionId);
       res.status(200).json({
         success: true,
         message: result.message,
         cooldown: result.cooldown,
-        debugOtp: result.debugOtp
+        expiresInSeconds: result.expiresInSeconds
       });
     } catch (err) {
       next(err);
@@ -68,8 +79,8 @@ export class PublicController {
 
   async verifyWhatsAppOtp(req: Request, res: Response, next: NextFunction) {
     try {
-      const { phone, otp } = req.body;
-      const result = await whatsappOtpService.verifyOtp(phone, otp);
+      const { phone, otp, sessionId } = req.body;
+      const result = await whatsappOtpService.verifyOtp(phone, otp, sessionId);
       res.status(200).json({
         success: true,
         verified: true,
@@ -88,8 +99,7 @@ export class PublicController {
       res.status(200).json({
         success: true,
         message: result.message,
-        cooldown: result.cooldown,
-        debugOtp: result.debugOtp
+        cooldown: result.cooldown
       });
     } catch (err) {
       next(err);

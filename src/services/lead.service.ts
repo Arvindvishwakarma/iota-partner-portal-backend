@@ -13,6 +13,7 @@ import {
 import { logger } from '../config/logger';
 import { toCapitalCase } from '../validators/public-lead.validator';
 import { formatAffiliateBusinessName } from '../utils/user-display';
+import { whatsappOtpService } from './whatsapp-otp.service';
 
 export class LeadService {
   /**
@@ -95,7 +96,7 @@ export class LeadService {
    * Public list of available academic courses
    */
   async getActiveCourses() {
-    return prisma.course.findMany({
+    const courses = await prisma.course.findMany({
       where: { isActive: true },
       select: {
         id: true,
@@ -107,6 +108,75 @@ export class LeadService {
       },
       orderBy: { name: 'asc' }
     });
+
+    const preferredOrder = [
+      'Data Analytics with AI',
+      'Data Science with AI',
+      'Business Analytics with AI',
+      'Machine Learning with AI',
+      'Artificial Intelligence with AI',
+      'Full Stack Development with AI',
+      'Not sure yet - need guidance'
+    ];
+
+    return courses.sort((a, b) => {
+      const idxA = preferredOrder.findIndex((name) => name.toLowerCase() === a.name.toLowerCase());
+      const idxB = preferredOrder.findIndex((name) => name.toLowerCase() === b.name.toLowerCase());
+      const orderA = idxA === -1 ? Number.MAX_SAFE_INTEGER : idxA;
+      const orderB = idxB === -1 ? Number.MAX_SAFE_INTEGER : idxB;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  /**
+   * Normalize to 10-digit Indian phone and E.164 variants for duplicate matching across leads
+   */
+  private buildPhoneMatchVariants(rawPhones: Array<string | undefined | null>): string[] {
+    const variants = new Set<string>();
+    for (const raw of rawPhones) {
+      const digits = (raw || '').replace(/\D/g, '').slice(-10);
+      if (/^[6-9]\d{9}$/.test(digits)) {
+        variants.add(digits);
+        variants.add(`+91${digits}`);
+      }
+    }
+    return Array.from(variants);
+  }
+
+  private async findDuplicateLeadByPhones(rawPhones: Array<string | undefined | null>) {
+    const variants = this.buildPhoneMatchVariants(rawPhones);
+    if (variants.length === 0) return null;
+
+    const attributionThreshold = new Date(Date.now() - ATTRIBUTION_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    return prisma.lead.findFirst({
+      where: {
+        createdAt: { gte: attributionThreshold },
+        OR: [{ mobile: { in: variants } }, { whatsapp: { in: variants } }]
+      },
+      include: {
+        partner: {
+          select: { id: true, affiliateCode: true, firstName: true, lastName: true, firmName: true, occupation: true }
+        }
+      }
+    });
+  }
+
+  /**
+   * Non-PII check whether an enquiry already exists for a mobile or WhatsApp number
+   */
+  async checkDuplicatePhone(
+    mobile?: string,
+    whatsapp?: string
+  ): Promise<{ isDuplicate: boolean; message?: string }> {
+    const existing = await this.findDuplicateLeadByPhones([mobile, whatsapp]);
+    if (existing) {
+      return {
+        isDuplicate: true,
+        message: 'An enquiry has already been submitted with this phone number.'
+      };
+    }
+    return { isDuplicate: false };
   }
 
   /**
@@ -116,33 +186,39 @@ export class LeadService {
     partnerCode: string;
     studentName: string;
     mobile: string;
-    whatsapp?: string;
-    interestedCourseId?: string;
+    whatsapp: string;
+    whatsappVerificationToken: string;
+    otpSessionId: string;
+    interestedCourseId: string;
     currentEducation: string;
     city: string;
-    area?: string;
     preferredContactTime: string;
+    preferredLearningMode?: string;
     communicationConsent: boolean;
+    consentVersion?: string;
   }) {
-    // 1. Verify Partner Eligibility
+    // 0. Enforce server-side single-use WhatsApp OTP verification bound to exact number & session (never bypassed)
+    const isWhatsappVerified = whatsappOtpService.consumePhoneVerification(
+      data.whatsapp,
+      data.whatsappVerificationToken,
+      data.otpSessionId
+    );
+    if (!isWhatsappVerified) {
+      throw new AppError(
+        'WhatsApp number verification is missing, expired, or invalid for this enquiry session. Please verify your WhatsApp number via OTP.',
+        400,
+        'WHATSAPP_NOT_VERIFIED'
+      );
+    }
+
+    // 1. Verify Partner Eligibility (kept strictly internal for attribution)
     const partner = await this.verifyPartnerCode(data.partnerCode);
 
-    // 2. Duplicate Attribution Check
-    const attributionThreshold = new Date(Date.now() - ATTRIBUTION_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-
-    const existingLead = await prisma.lead.findFirst({
-      where: {
-        mobile: data.mobile,
-        createdAt: { gte: attributionThreshold }
-      },
-      include: {
-        partner: { select: { id: true, affiliateCode: true, firstName: true, lastName: true, firmName: true, occupation: true } }
-      }
-    });
+    // 2. Duplicate Attribution Check (matches mobile or WhatsApp within 60-day window)
+    const existingLead = await this.findDuplicateLeadByPhones([data.mobile, data.whatsapp]);
 
     // Handle Duplicate Submissions within 60-day Window (Rule BR-LED-02)
     if (existingLead) {
-      const existingPartnerBusiness = existingLead.partner ? formatAffiliateBusinessName(existingLead.partner) : 'ORGANIC';
       logger.info(
         `Duplicate enquiry detected for ${data.mobile}. Original Partner: ${existingLead.partner?.affiliateCode || 'ORGANIC'}. Attempted Partner: ${partner.partnerCode}. Preserving original attribution.`
       );
@@ -169,27 +245,24 @@ export class LeadService {
         }
       });
 
-      return {
-        leadCode: existingLead.leadCode,
-        studentName: data.studentName,
-        isExistingLead: true,
-        partnerBusinessName: existingLead.partner ? existingPartnerBusiness : partner.businessName,
-        message: 'Your enquiry has been successfully received! An academic counselor will connect with you shortly.'
-      };
+      throw new AppError(
+        'Duplicate enquiry: an enquiry has already been submitted with this phone number. Our team already has your details and will contact you shortly.',
+        409,
+        'DUPLICATE_LEAD'
+      );
     }
 
     // 3. Round-Robin Counselor Auto-Assignment (Rule BR-LED-04)
     const assignedCounsellorId = await this.getRoundRobinCounsellorId();
 
-    // 4. Generate Unique Lead Code & Resolve Course ID
-    const year = new Date().getFullYear();
-    const count = await prisma.lead.count();
-    const leadCode = `LD-${year}-${String(count + 1).padStart(4, '0')}`;
+    // 4. Generate Unique Lead Code (IALD000101, IALD000102, ...) & Resolve Course ID
+    const leadCode = await this.generateUniqueLeadCode();
 
     let resolvedCourseId: string | null = null;
     if (data.interestedCourseId && data.interestedCourseId.trim()) {
       const matchCourse = await prisma.course.findFirst({
         where: {
+          isActive: true,
           OR: [
             { id: data.interestedCourseId },
             { name: { equals: data.interestedCourseId, mode: 'insensitive' } },
@@ -197,10 +270,14 @@ export class LeadService {
           ]
         }
       });
-      if (matchCourse) {
-        resolvedCourseId = matchCourse.id;
+      if (!matchCourse) {
+        throw new AppError('Please select a valid active course.', 400, 'INVALID_COURSE');
       }
+      resolvedCourseId = matchCourse.id;
     }
+
+    const fallbackUserId = assignedCounsellorId || (await this.getFallbackAdminUserId());
+    const now = new Date();
 
     // 5. Commit Lead in Transaction
     const newLead = await prisma.$transaction(async (tx) => {
@@ -213,13 +290,19 @@ export class LeadService {
           studentName: toCapitalCase(data.studentName),
           mobile: data.mobile,
           whatsapp: data.whatsapp || data.mobile,
-          currentEducation: data.currentEducation,
+          currentEducation: data.currentEducation.trim(),
           city: toCapitalCase(data.city),
-          area: data.area,
           preferredContactTime: data.preferredContactTime,
+          preferredLearningMode: data.preferredLearningMode || 'OFFLINE',
           communicationConsent: data.communicationConsent,
+          consentAt: now,
+          consentVersion: data.consentVersion || 'v1.0',
+          whatsappOtpVerified: true,
           status: LeadStatus.NEW,
-          currentCounsellorId: assignedCounsellorId
+          currentMainStatus: 'Not Connected Yet',
+          currentCounsellorId: assignedCounsellorId,
+          lastActivityAt: now,
+          lastActivityById: fallbackUserId
         }
       });
 
@@ -265,9 +348,43 @@ export class LeadService {
       leadCode: newLead.leadCode,
       studentName: newLead.studentName,
       isExistingLead: false,
-      partnerBusinessName: partner.businessName,
-      message: 'Registration successful! An IOTA Academy counselor will contact you during your preferred slot.'
+      message:
+        'Thank you for your enquiry! Our IOTA Academy counsellor will contact you shortly to assist you with your course enquiry and free demo.'
     };
+  }
+
+  /**
+   * Generate sequential unique lead code starting from IALD000101
+   */
+  private async generateUniqueLeadCode(): Promise<string> {
+    const existingCodes = await prisma.lead.findMany({
+      where: { leadCode: { startsWith: 'IALD' } },
+      select: { leadCode: true }
+    });
+
+    let maxNum = 100;
+    for (const row of existingCodes) {
+      const match = /^IALD(\d+)$/i.exec(row.leadCode.trim());
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!Number.isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+
+    let candidateNum = maxNum + 1;
+    while (true) {
+      const code = `IALD${String(candidateNum).padStart(6, '0')}`;
+      const conflict = await prisma.lead.findUnique({
+        where: { leadCode: code },
+        select: { id: true }
+      });
+      if (!conflict) {
+        return code;
+      }
+      candidateNum += 1;
+    }
   }
 
   /**

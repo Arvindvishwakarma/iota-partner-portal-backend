@@ -8,7 +8,8 @@ import { AppError } from '../middlewares/error.middleware';
 
 interface StoredOtp {
   phone: string; // 10 digits
-  otp: string; // 6 digits
+  sessionId?: string;
+  otpHash: string; // SHA-256 hex digest of phone:otp
   expiresAt: number; // timestamp
   attempts: number;
   lastSentAt: number;
@@ -17,11 +18,21 @@ interface StoredOtp {
 }
 
 export class WhatsAppOtpService {
-  // In-memory store for OTPs (phone -> StoredOtp)
+  // In-memory store for OTPs ((phone or phone:sessionId) -> StoredOtp)
   private otpStore = new Map<string, StoredOtp>();
+
+  // Rolling per-phone send timestamps for rate limiting
+  private phoneSendHistory = new Map<string, number[]>();
+
+  // Track single-use consumed verification token IDs to prevent replay
+  private consumedTokenIds = new Map<string, number>();
 
   // Cooldown between resend requests (seconds)
   private readonly RESEND_COOLDOWN_SECONDS = 30;
+
+  // Max OTPs sent per phone within rolling rate window
+  private readonly PHONE_RATE_WINDOW_MS = 15 * 60 * 1000;
+  private readonly MAX_OTP_PER_PHONE_WINDOW = 5;
 
   // OTP Validity (10 minutes)
   private readonly OTP_EXPIRY_MS = 10 * 60 * 1000;
@@ -34,16 +45,39 @@ export class WhatsAppOtpService {
 
   constructor() {
     // Periodic cleanup of expired records every 15 minutes
-    setInterval(() => {
+    const timer = setInterval(() => {
       this.cleanupExpired();
     }, 15 * 60 * 1000);
+    timer.unref?.();
+  }
+
+  private getStoreKey(cleanPhone: string, sessionId?: string): string {
+    const cleanSession = (sessionId || '').trim();
+    return cleanSession ? `${cleanPhone}:${cleanSession}` : cleanPhone;
+  }
+
+  private hashOtp(cleanPhone: string, otp: string): string {
+    return crypto.createHash('sha256').update(`${cleanPhone}:${otp}`).digest('hex');
   }
 
   private cleanupExpired() {
     const now = Date.now();
-    for (const [phone, record] of this.otpStore.entries()) {
+    for (const [key, record] of this.otpStore.entries()) {
       if (record.expiresAt < now && (!record.verifiedAt || record.verifiedAt + this.VERIFIED_VALIDITY_MS < now)) {
-        this.otpStore.delete(phone);
+        this.otpStore.delete(key);
+      }
+    }
+    for (const [phone, stamps] of this.phoneSendHistory.entries()) {
+      const active = stamps.filter((ts) => now - ts < this.PHONE_RATE_WINDOW_MS);
+      if (active.length === 0) {
+        this.phoneSendHistory.delete(phone);
+      } else {
+        this.phoneSendHistory.set(phone, active);
+      }
+    }
+    for (const [jti, exp] of this.consumedTokenIds.entries()) {
+      if (exp < now) {
+        this.consumedTokenIds.delete(jti);
       }
     }
   }
@@ -101,41 +135,82 @@ export class WhatsAppOtpService {
   }
 
   /**
-   * Generate signed HMAC verification token for a verified phone number
+   * Generate signed HMAC verification token bound to phone, optional session, timestamp, and unique nonce
    */
-  public generateVerificationToken(phone: string): string {
+  public generateVerificationToken(phone: string, sessionId?: string): string {
     const cleanPhone = this.normalizePhone(phone);
+    const cleanSession = (sessionId || 'default').trim().replace(/:/g, '');
     const timestamp = Date.now();
+    const jti = crypto.randomBytes(12).toString('hex');
     const secret = env.JWT_ACCESS_SECRET || 'iota_otp_secret_fallback_2026';
-    const payload = `${cleanPhone}:${timestamp}`;
+    const payload = `${cleanPhone}:${cleanSession}:${timestamp}:${jti}`;
     const signature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
     return Buffer.from(`${payload}:${signature}`).toString('base64');
+  }
+
+  private parseAndVerifyToken(
+    token: string,
+    expectedPhone: string,
+    expectedSessionId?: string
+  ): { valid: boolean; jti?: string } {
+    try {
+      const decoded = Buffer.from(token, 'base64').toString('utf-8');
+      const parts = decoded.split(':');
+      const cleanExpected = this.normalizePhone(expectedPhone);
+      const secret = env.JWT_ACCESS_SECRET || 'iota_otp_secret_fallback_2026';
+
+      // Support legacy 3-part tokens (phone:ts:sig) and session-bound 5-part tokens (phone:session:ts:jti:sig)
+      if (parts.length === 3) {
+        if (expectedSessionId) return { valid: false };
+        const [phone, timestampStr, signature] = parts;
+        if (phone !== cleanExpected) return { valid: false };
+        const timestamp = parseInt(timestampStr, 10);
+        if (isNaN(timestamp) || Date.now() - timestamp > this.VERIFIED_VALIDITY_MS) {
+          return { valid: false };
+        }
+        const expectedSig = crypto.createHmac('sha256', secret).update(`${phone}:${timestampStr}`).digest('hex');
+        const sigBuf = Buffer.from(signature);
+        const expBuf = Buffer.from(expectedSig);
+        if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+          return { valid: false };
+        }
+        return { valid: true };
+      }
+
+      if (parts.length !== 5) return { valid: false };
+      const [phone, tokenSession, timestampStr, jti, signature] = parts;
+      if (phone !== cleanExpected) return { valid: false };
+      if (expectedSessionId) {
+        const cleanExpectedSession = expectedSessionId.trim().replace(/:/g, '');
+        if (tokenSession !== cleanExpectedSession) return { valid: false };
+      }
+      if (this.consumedTokenIds.has(jti)) return { valid: false };
+
+      const timestamp = parseInt(timestampStr, 10);
+      if (isNaN(timestamp) || Date.now() - timestamp > this.VERIFIED_VALIDITY_MS) {
+        return { valid: false };
+      }
+
+      const expectedSig = crypto
+        .createHmac('sha256', secret)
+        .update(`${phone}:${tokenSession}:${timestampStr}:${jti}`)
+        .digest('hex');
+      const sigBuf = Buffer.from(signature);
+      const expBuf = Buffer.from(expectedSig);
+      if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+        return { valid: false };
+      }
+      return { valid: true, jti };
+    } catch {
+      return { valid: false };
+    }
   }
 
   /**
    * Verify an HMAC verification token
    */
-  public verifyToken(token: string, expectedPhone: string): boolean {
-    try {
-      const decoded = Buffer.from(token, 'base64').toString('utf-8');
-      const parts = decoded.split(':');
-      if (parts.length !== 3) return false;
-
-      const [phone, timestampStr, signature] = parts;
-      const cleanExpected = this.normalizePhone(expectedPhone);
-      if (phone !== cleanExpected) return false;
-
-      const timestamp = parseInt(timestampStr, 10);
-      if (isNaN(timestamp) || Date.now() - timestamp > this.VERIFIED_VALIDITY_MS) {
-        return false;
-      }
-
-      const secret = env.JWT_ACCESS_SECRET || 'iota_otp_secret_fallback_2026';
-      const expectedSig = crypto.createHmac('sha256', secret).update(`${phone}:${timestampStr}`).digest('hex');
-      return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig));
-    } catch {
-      return false;
-    }
+  public verifyToken(token: string, expectedPhone: string, expectedSessionId?: string): boolean {
+    return this.parseAndVerifyToken(token, expectedPhone, expectedSessionId).valid;
   }
 
   /**
@@ -391,7 +466,7 @@ export class WhatsAppOtpService {
           type: 'text',
           text: {
             preview_url: false,
-            body: `Your IOTA Academy Partner OTP is *${otp}* (valid for 10 minutes).`
+            body: `Your IOTA Academy verification OTP is *${otp}* (valid for 10 minutes).`
           }
         })
       });
@@ -460,14 +535,18 @@ export class WhatsAppOtpService {
   /**
    * Send WhatsApp OTP
    */
-  async sendOtp(rawPhone: string): Promise<{ success: boolean; message: string; cooldown: number; debugOtp?: string }> {
+  async sendOtp(
+    rawPhone: string,
+    sessionId?: string
+  ): Promise<{ success: boolean; message: string; cooldown: number; expiresInSeconds: number }> {
     const cleanPhone = this.normalizePhone(rawPhone);
     if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
       throw new AppError('Please enter a valid 10-digit Indian mobile number starting with 6–9', 400, 'INVALID_PHONE');
     }
 
     const now = Date.now();
-    const existing = this.otpStore.get(cleanPhone);
+    const storeKey = this.getStoreKey(cleanPhone, sessionId);
+    const existing = this.otpStore.get(storeKey);
 
     // Cooldown check (30 seconds)
     if (existing && now - existing.lastSentAt < this.RESEND_COOLDOWN_SECONDS * 1000) {
@@ -479,58 +558,95 @@ export class WhatsAppOtpService {
       );
     }
 
-    // Generate cryptographically secure 6-digit OTP
-    const otp = crypto.randomInt(100000, 999999).toString();
+    // Per-phone rolling window rate limit (prevents abuse across sessions)
+    const history = (this.phoneSendHistory.get(cleanPhone) || []).filter(
+      (ts) => now - ts < this.PHONE_RATE_WINDOW_MS
+    );
+    if (history.length >= this.MAX_OTP_PER_PHONE_WINDOW) {
+      throw new AppError(
+        'Too many OTP requests for this WhatsApp number. Please try again after 15 minutes.',
+        429,
+        'OTP_RATE_LIMITED'
+      );
+    }
 
-    // Store in-memory
-    this.otpStore.set(cleanPhone, {
+    // Generate cryptographically secure 6-digit OTP and store only its hash
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const otpHash = this.hashOtp(cleanPhone, otp);
+
+    // Dispatch via WhatsApp Cloud API first before committing send history
+    await this.dispatchMetaWhatsApp(cleanPhone, otp);
+
+    history.push(now);
+    this.phoneSendHistory.set(cleanPhone, history);
+
+    this.otpStore.set(storeKey, {
       phone: cleanPhone,
-      otp,
+      sessionId: sessionId?.trim() || undefined,
+      otpHash,
       expiresAt: now + this.OTP_EXPIRY_MS,
       attempts: 0,
       lastSentAt: now,
       verified: false
     });
 
-    // Dispatch via WhatsApp Cloud API
-    const dispatchResult = await this.dispatchMetaWhatsApp(cleanPhone, otp);
-
     return {
       success: true,
       message: `OTP sent successfully to your WhatsApp number +91 ${cleanPhone}.`,
-      cooldown: this.RESEND_COOLDOWN_SECONDS
+      cooldown: this.RESEND_COOLDOWN_SECONDS,
+      expiresInSeconds: Math.floor(this.OTP_EXPIRY_MS / 1000)
     };
   }
 
   /**
    * Verify WhatsApp OTP
    */
-  async verifyOtp(rawPhone: string, enteredOtp: string): Promise<{ success: boolean; verified: boolean; verificationToken: string; message: string }> {
+  async verifyOtp(
+    rawPhone: string,
+    enteredOtp: string,
+    sessionId?: string
+  ): Promise<{ success: boolean; verified: boolean; verificationToken: string; message: string }> {
     const cleanPhone = this.normalizePhone(rawPhone);
     const cleanOtp = (enteredOtp || '').trim();
 
-    if (!cleanOtp || cleanOtp.length !== 6) {
+    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      throw new AppError('Please enter a valid 10-digit WhatsApp number', 400, 'INVALID_PHONE');
+    }
+
+    if (!/^\d{6}$/.test(cleanOtp)) {
       throw new AppError('Please enter a valid 6-digit OTP code', 400, 'INVALID_OTP');
     }
 
-    const record = this.otpStore.get(cleanPhone);
+    const storeKey = this.getStoreKey(cleanPhone, sessionId);
+    const record = this.otpStore.get(storeKey);
     if (!record) {
-      throw new AppError('No active OTP found for this number. Please request a new OTP.', 400, 'NO_OTP_FOUND');
+      throw new AppError('No active OTP found for this WhatsApp number. Please request a new OTP.', 400, 'NO_OTP_FOUND');
+    }
+
+    if (record.verified || !record.otpHash) {
+      throw new AppError('This OTP has already been used. Please request a new OTP if needed.', 400, 'OTP_ALREADY_USED');
     }
 
     if (Date.now() > record.expiresAt) {
-      this.otpStore.delete(cleanPhone);
+      this.otpStore.delete(storeKey);
       throw new AppError('The OTP has expired. Please request a new one.', 400, 'OTP_EXPIRED');
     }
 
     if (record.attempts >= this.MAX_ATTEMPTS) {
-      this.otpStore.delete(cleanPhone);
+      this.otpStore.delete(storeKey);
       throw new AppError('Too many failed verification attempts. Please request a new OTP.', 400, 'MAX_ATTEMPTS_EXCEEDED');
     }
 
-    if (record.otp !== cleanOtp) {
+    const enteredHash = this.hashOtp(cleanPhone, cleanOtp);
+    const isMatch = crypto.timingSafeEqual(Buffer.from(enteredHash, 'hex'), Buffer.from(record.otpHash, 'hex'));
+
+    if (!isMatch) {
       record.attempts++;
       const remainingAttempts = this.MAX_ATTEMPTS - record.attempts;
+      if (remainingAttempts <= 0) {
+        this.otpStore.delete(storeKey);
+        throw new AppError('Incorrect OTP. Maximum attempts reached. Please request a new OTP.', 400, 'MAX_ATTEMPTS_EXCEEDED');
+      }
       throw new AppError(
         `Incorrect OTP. ${remainingAttempts} attempt${remainingAttempts === 1 ? '' : 's'} remaining.`,
         400,
@@ -538,33 +654,35 @@ export class WhatsAppOtpService {
       );
     }
 
-    // Mark verified
+    // Mark verified and wipe OTP hash so the same OTP cannot be reused
     record.verified = true;
     record.verifiedAt = Date.now();
+    record.otpHash = '';
 
-    const verificationToken = this.generateVerificationToken(cleanPhone);
+    const verificationToken = this.generateVerificationToken(cleanPhone, sessionId);
 
     return {
       success: true,
       verified: true,
       verificationToken,
-      message: 'WhatsApp number verified successfully!'
+      message: 'WhatsApp Number Verified'
     };
   }
 
   /**
    * Check if a phone is verified (either via in-memory record or signed verification token)
    */
-  public isPhoneVerified(rawPhone: string, verificationToken?: string | null): boolean {
+  public isPhoneVerified(rawPhone: string, verificationToken?: string | null, sessionId?: string): boolean {
     const cleanPhone = this.normalizePhone(rawPhone);
 
     // 1. Verify token if passed
-    if (verificationToken && this.verifyToken(verificationToken, cleanPhone)) {
+    if (verificationToken && this.verifyToken(verificationToken, cleanPhone, sessionId)) {
       return true;
     }
 
     // 2. Check in-memory store
-    const record = this.otpStore.get(cleanPhone);
+    const storeKey = this.getStoreKey(cleanPhone, sessionId);
+    const record = this.otpStore.get(storeKey);
     if (record && record.verified && record.verifiedAt) {
       if (Date.now() - record.verifiedAt <= this.VERIFIED_VALIDITY_MS) {
         return true;
@@ -572,6 +690,30 @@ export class WhatsAppOtpService {
     }
 
     return false;
+  }
+
+  /**
+   * Strictly validate and consume a session-bound WhatsApp OTP verification token (single-use).
+   */
+  public consumePhoneVerification(rawPhone: string, verificationToken?: string | null, sessionId?: string): boolean {
+    const cleanPhone = this.normalizePhone(rawPhone);
+    if (!/^[6-9]\d{9}$/.test(cleanPhone) || !verificationToken) {
+      return false;
+    }
+
+    const parsed = this.parseAndVerifyToken(verificationToken, cleanPhone, sessionId);
+    if (!parsed.valid) {
+      return false;
+    }
+
+    const storeKey = this.getStoreKey(cleanPhone, sessionId);
+    this.otpStore.delete(storeKey);
+
+    if (parsed.jti) {
+      this.consumedTokenIds.set(parsed.jti, Date.now() + this.VERIFIED_VALIDITY_MS);
+    }
+
+    return true;
   }
 
   /**

@@ -50,20 +50,29 @@ export const publicStudentLeadSchema = z.object({
       message: 'Please enter a valid 10-digit Indian mobile number (e.g., 8962545150 or +918962545150)'
     }),
   whatsapp: z
-    .string()
-    .optional()
-    .transform((val) => (val ? normalizeIndianPhone(val) : undefined))
-    .refine((val) => !val || INDIAN_PHONE_REGEX.test(val), {
-      message: 'Invalid WhatsApp number format'
+    .string({ required_error: 'WhatsApp number is required' })
+    .transform((val) => normalizeIndianPhone(val))
+    .refine((val) => INDIAN_PHONE_REGEX.test(val), {
+      message: 'Please enter a valid 10-digit Indian WhatsApp number'
     }),
-  interestedCourseId: z.string().optional(),
-  currentEducation: z.string().min(2, 'Current educational background is required').trim(),
+  whatsappVerificationToken: z
+    .string({ required_error: 'WhatsApp OTP verification is required' })
+    .trim()
+    .min(10, 'WhatsApp OTP verification is required'),
+  otpSessionId: z
+    .string({ required_error: 'Enquiry verification session is required' })
+    .trim()
+    .min(8, 'Invalid verification session')
+    .max(120),
+  interestedCourseId: z.string({ required_error: 'Interested course is required' }).trim().min(1, 'Please select your interested course'),
+  currentEducation: z.string().min(2, 'Highest education is required').trim(),
   city: z.string().min(2, 'City is required').trim().transform(toCapitalCase),
-  area: z.string().optional(),
   preferredContactTime: z.enum(['MORNING_10AM_1PM', 'AFTERNOON_1PM_4PM', 'EVENING_4PM_7PM', 'ANYTIME']).default('ANYTIME'),
+  preferredLearningMode: z.enum(['OFFLINE', 'ONLINE', 'HYBRID']).default('OFFLINE'),
   communicationConsent: z.boolean({ required_error: 'Communication consent is required' }).refine((val) => val === true, {
-    message: 'You must consent to be contacted by IOTA Academy academic counselors'
-  })
+    message: 'You must agree to receive updates from IOTA Academy before submitting'
+  }),
+  consentVersion: z.string().trim().max(30).optional().default('v1.0')
 });
 
 export const createSupportTicketSchema = z.object({
