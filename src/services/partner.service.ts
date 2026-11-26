@@ -926,7 +926,7 @@ export class PartnerService {
             userId: a.id,
             title: `New Affiliate Application [${result.affiliate.affiliateCode}]`,
             message: `${fullName} (${data.occupation}, ${state}) submitted an affiliate application. Review pending approval.`,
-            actionUrl: '/admin/partners'
+            actionUrl: '/admin/affiliate'
           }))
         });
       }
