@@ -783,22 +783,82 @@ export class PartnerService {
   }
 
   /**
-   * Support Tickets
+   * List Support Tickets submitted by this Affiliate (Active Accounts Only)
+   */
+  async getTickets(partnerId: string, page = 1, limit = 20) {
+    const affiliate = await prisma.affiliate.findUnique({ where: { id: partnerId }, select: { status: true } });
+    if (!affiliate) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
+    if (affiliate.status !== AffiliateStatus.ACTIVE) {
+      throw new AppError('Help & Support is restricted while your registration is pending approval.', 403, 'ACCOUNT_RESTRICTED');
+    }
+
+    const where = { partnerId };
+    const [total, tickets] = await Promise.all([
+      prisma.supportTicket.count({ where }),
+      prisma.supportTicket.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit
+      })
+    ]);
+
+    return {
+      tickets,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) }
+    };
+  }
+
+  /**
+   * Submit Support Ticket (Active Affiliates Only)
    */
   async createTicket(partnerId: string, userId: string, data: { subject: string; description: string; priority?: string }) {
-    const count = await prisma.supportTicket.count();
-    const ticketCode = `TKT-${String(count + 1).padStart(4, '0')}`;
+    const affiliate = await prisma.affiliate.findUnique({
+      where: { id: partnerId },
+      select: { id: true, affiliateCode: true, firstName: true, lastName: true, status: true }
+    });
+    if (!affiliate) throw new AppError('Affiliate not found', 404, 'NOT_FOUND');
+    if (affiliate.status !== AffiliateStatus.ACTIVE) {
+      throw new AppError('Help & Support is restricted while your registration is pending approval.', 403, 'ACCOUNT_RESTRICTED');
+    }
 
-    return prisma.supportTicket.create({
+    const lastTicket = await prisma.supportTicket.findFirst({
+      orderBy: { createdAt: 'desc' },
+      select: { ticketCode: true }
+    });
+    const lastNum = lastTicket?.ticketCode?.match(/(\d+)$/)?.[1];
+    const nextNum = (lastNum ? parseInt(lastNum, 10) : await prisma.supportTicket.count()) + 1;
+    const ticketCode = `TKT-${String(nextNum).padStart(4, '0')}`;
+
+    const created = await prisma.supportTicket.create({
       data: {
         ticketCode,
         partnerId,
         createdById: userId,
-        subject: data.subject,
-        description: data.description,
+        subject: data.subject.trim(),
+        description: data.description.trim(),
         priority: (data.priority as TicketPriority) || TicketPriority.MEDIUM
       }
     });
+
+    // Notify active Admins about the new affiliate help request
+    const admins = await prisma.user.findMany({
+      where: { role: Role.ADMIN, isActive: true, deletedAt: null },
+      select: { id: true }
+    });
+    if (admins.length > 0) {
+      const affName = formatFullName(affiliate.firstName, affiliate.lastName);
+      await prisma.notification.createMany({
+        data: admins.map((adm) => ({
+          userId: adm.id,
+          title: `New Support Ticket ${ticketCode}`,
+          message: `${affName} (${affiliate.affiliateCode}) raised a ${created.priority} ticket: ${created.subject}`,
+          actionUrl: '/admin/tickets'
+        }))
+      });
+    }
+
+    return created;
   }
 
   /**

@@ -131,4 +131,10 @@ export const updateContactStatusSchema = z.object({
   adminNotes: z.string().optional().nullable()
 });
 
+// Affiliate Support Ticket Status & Notes Update Schema
+export const updateSupportTicketSchema = z.object({
+  status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']).optional(),
+  adminNotes: z.string().trim().max(2000).optional().nullable()
+});
+
 

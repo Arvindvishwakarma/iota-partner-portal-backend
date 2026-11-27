@@ -298,6 +298,35 @@ export class AdminController {
       next(err);
     }
   }
+
+  // Affiliate Support Tickets Handlers
+  async listSupportTickets(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await adminService.listSupportTickets(req.query);
+      res.status(200).json({
+        success: true,
+        data: result.tickets,
+        meta: result.meta,
+        counts: result.counts
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateSupportTicketStatus(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const updated = await adminService.updateSupportTicketStatus(id, req.user!.userId, req.body);
+      res.status(200).json({
+        success: true,
+        data: updated,
+        message: 'Support ticket updated successfully'
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const adminController = new AdminController();

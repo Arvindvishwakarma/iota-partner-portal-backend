@@ -20,6 +20,7 @@ router.get('/commissions', partnerController.getCommissions.bind(partnerControll
 router.get('/settlements', partnerController.getSettlements.bind(partnerController));
 router.post('/withdraw', validateBody(requestWithdrawalSchema), partnerController.requestWithdrawal.bind(partnerController));
 router.post('/settlements/withdraw', validateBody(requestWithdrawalSchema), partnerController.requestWithdrawal.bind(partnerController));
+router.get('/tickets', partnerController.getTickets.bind(partnerController));
 router.post('/tickets', validateBody(createSupportTicketSchema), partnerController.createTicket.bind(partnerController));
 
 export default router;

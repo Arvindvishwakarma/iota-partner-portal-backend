@@ -1080,6 +1080,146 @@ export class AdminService {
     await prisma.contactMessage.delete({ where: { id } });
     return { success: true };
   }
+
+  /**
+   * Affiliate Help & Support Tickets
+   */
+  async listSupportTickets(query: any) {
+    const page = Math.max(1, parseInt(query.page as string, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(query.limit as string, 10) || 20));
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.SupportTicketWhereInput = {};
+    if (query.status && query.status !== 'ALL') {
+      where.status = query.status as any;
+    }
+    if (query.priority && query.priority !== 'ALL') {
+      where.priority = query.priority as any;
+    }
+    if (query.search && String(query.search).trim()) {
+      const q = String(query.search).trim();
+      where.OR = [
+        { ticketCode: { contains: q, mode: 'insensitive' } },
+        { subject: { contains: q, mode: 'insensitive' } },
+        { description: { contains: q, mode: 'insensitive' } },
+        { partner: { affiliateCode: { contains: q, mode: 'insensitive' } } },
+        { partner: { firstName: { contains: q, mode: 'insensitive' } } },
+        { partner: { lastName: { contains: q, mode: 'insensitive' } } },
+        { partner: { emailAddress: { contains: q, mode: 'insensitive' } } }
+      ];
+    }
+
+    const [total, openCount, inProgressCount, resolvedCount, tickets] = await Promise.all([
+      prisma.supportTicket.count({ where }),
+      prisma.supportTicket.count({ where: { status: 'OPEN' } }),
+      prisma.supportTicket.count({ where: { status: 'IN_PROGRESS' } }),
+      prisma.supportTicket.count({ where: { status: { in: ['RESOLVED', 'CLOSED'] } } }),
+      prisma.supportTicket.findMany({
+        where,
+        include: {
+          partner: {
+            select: {
+              id: true,
+              affiliateCode: true,
+              firstName: true,
+              lastName: true,
+              emailAddress: true,
+              mobileNumber: true,
+              whatsappNumber: true,
+              city: true,
+              state: true
+            }
+          },
+          assignee: {
+            select: { id: true, firstName: true, lastName: true }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit
+      })
+    ]);
+
+    return {
+      tickets: tickets.map((t) => ({
+        ...t,
+        partner: {
+          ...t.partner,
+          fullName: formatFullName(t.partner.firstName, t.partner.lastName)
+        },
+        assigneeName: t.assignee ? formatFullName(t.assignee.firstName, t.assignee.lastName) : null
+      })),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      },
+      counts: {
+        total: openCount + inProgressCount + resolvedCount,
+        open: openCount,
+        inProgress: inProgressCount,
+        resolved: resolvedCount
+      }
+    };
+  }
+
+  async updateSupportTicketStatus(
+    id: string,
+    adminUserId: string,
+    data: { status?: string; adminNotes?: string | null }
+  ) {
+    const existing = await prisma.supportTicket.findUnique({ where: { id } });
+    if (!existing) {
+      throw new AppError('Support ticket not found', 404, 'NOT_FOUND');
+    }
+
+    const updateData: Prisma.SupportTicketUpdateInput = {
+      assignee: { connect: { id: adminUserId } }
+    };
+
+    if (data.status) {
+      updateData.status = data.status as any;
+      if (data.status === 'RESOLVED' || data.status === 'CLOSED') {
+        updateData.resolvedAt = existing.resolvedAt || new Date();
+      } else {
+        updateData.resolvedAt = null;
+      }
+    }
+
+    if (data.adminNotes !== undefined) {
+      updateData.adminNotes = data.adminNotes?.trim() || null;
+    }
+
+    const updated = await prisma.supportTicket.update({
+      where: { id },
+      data: updateData,
+      include: {
+        partner: {
+          select: {
+            id: true,
+            affiliateCode: true,
+            firstName: true,
+            lastName: true,
+            emailAddress: true,
+            mobileNumber: true,
+            whatsappNumber: true
+          }
+        }
+      }
+    });
+
+    await prisma.notification.create({
+      data: {
+        userId: existing.createdById,
+        title: `Support Ticket ${existing.ticketCode} Updated`,
+        message: `Status changed to ${updated.status.replace(/_/g, ' ')}${updated.adminNotes ? `: ${updated.adminNotes}` : ''}`,
+        actionUrl: '/affiliate/support'
+      }
+    });
+
+    return updated;
+  }
 }
 
 export const adminService = new AdminService();

@@ -88,6 +88,19 @@ export class PartnerController {
     }
   }
 
+  async getTickets(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const partnerId = this.getPartnerId(req);
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+
+      const result = await partnerService.getTickets(partnerId, page, limit);
+      res.status(200).json({ success: true, data: result.tickets, meta: result.meta });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async createTicket(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const partnerId = this.getPartnerId(req);

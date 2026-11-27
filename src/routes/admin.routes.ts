@@ -15,7 +15,8 @@ import {
   unassignVisitSchema,
   bulkAssignVisitsSchema,
   reassignLeadSchema,
-  updateContactStatusSchema
+  updateContactStatusSchema,
+  updateSupportTicketSchema
 } from '../validators/admin.validator';
 import { onboardPartnerSchema } from '../validators/sales.validator';
 
@@ -65,6 +66,10 @@ router.get('/contacts', adminController.listContactMessages);
 router.get('/contacts/:id', adminController.getContactMessage);
 router.patch('/contacts/:id', validateBody(updateContactStatusSchema), adminController.updateContactMessageStatus);
 router.delete('/contacts/:id', adminController.deleteContactMessage);
+
+// Affiliate Support Tickets Management
+router.get('/tickets', adminController.listSupportTickets);
+router.patch('/tickets/:id', validateBody(updateSupportTicketSchema), adminController.updateSupportTicketStatus);
 
 export default router;
 
