@@ -83,32 +83,10 @@ export class CounsellorController {
     }
   }
 
-  async getFollowups(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const counsellorId = req.user!.userId;
-      const role = req.user!.role;
-      const followups = await counsellorService.getFollowups(counsellorId, role);
-      res.status(200).json({ success: true, data: followups });
-    } catch (err) {
-      next(err);
-    }
-  }
-
   async getCourses(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const courses = await counsellorService.getCourses();
       res.status(200).json({ success: true, data: courses });
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  async getActivities(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const counsellorId = req.user!.userId;
-      const role = req.user!.role;
-      const activities = await counsellorService.getActivities(counsellorId, role);
-      res.status(200).json({ success: true, data: activities });
     } catch (err) {
       next(err);
     }
