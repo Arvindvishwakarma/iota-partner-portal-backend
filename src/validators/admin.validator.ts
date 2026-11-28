@@ -48,11 +48,14 @@ export const partnerApprovalSchema = z.object({
   kycRevisionRemark: z.string().optional()
 }).refine(
   (data) => {
-    if (data.status === AffiliateStatus.PROFILE_REJECTED && !data.rejectionReason?.trim()) {
+    if (
+      (data.status === AffiliateStatus.PROFILE_REJECTED || data.status === AffiliateStatus.KYC_REJECTED) &&
+      !data.rejectionReason?.trim()
+    ) {
       return false;
     }
     if (
-      data.status === AffiliateStatus.KYC_REJECTED &&
+      data.status === AffiliateStatus.KYC_REVISED &&
       !data.kycRevisionRemark?.trim() &&
       !data.rejectionReason?.trim()
     ) {

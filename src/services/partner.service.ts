@@ -1130,7 +1130,7 @@ export class PartnerService {
   }
 
   /**
-   * Submit KYC Details (available when affiliate status is KYC_PENDING or KYC_REJECTED)
+   * Submit KYC Details (available when affiliate status is KYC_PENDING or KYC_REVISED)
    */
   async submitKyc(partnerId: string, data: SubmitKycInput) {
     const existing = await prisma.affiliate.findUnique({
@@ -1141,7 +1141,7 @@ export class PartnerService {
       throw new AppError('Affiliate profile not found', 404, 'NOT_FOUND');
     }
 
-    if (existing.status !== AffiliateStatus.KYC_PENDING && existing.status !== AffiliateStatus.KYC_REJECTED) {
+    if (existing.status !== AffiliateStatus.KYC_PENDING && existing.status !== AffiliateStatus.KYC_REVISED) {
       throw new AppError(
         `KYC submission is not allowed while your profile status is '${existing.status}'.`,
         400,
@@ -1343,11 +1343,9 @@ export class PartnerService {
           bankName: data.bankName.trim(),
           bankProof: bankProofCloudUrl,
 
-          status:
-            existing.status === AffiliateStatus.KYC_REJECTED
-              ? AffiliateStatus.KYC_REVISED
-              : AffiliateStatus.KYC_SUBMITTED,
-          rejectionReason: null
+          status: AffiliateStatus.KYC_SUBMITTED,
+          rejectionReason: null,
+          kycRevisionRemark: null
         }
       });
     });

@@ -876,6 +876,66 @@ export class WhatsAppOtpService {
       'Profile rejection'
     );
   }
+
+  /**
+   * Dispatch KYC Revision notification via Meta WhatsApp template "affiliate_kyc_revised"
+   */
+  public async sendAffiliateKycRevisedWhatsApp(
+    phone: string,
+    affiliateName: string
+  ): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+    return this.sendAffiliateTemplateWhatsApp(
+      phone,
+      'affiliate_kyc_revised',
+      affiliateName,
+      'KYC revision'
+    );
+  }
+
+  /**
+   * Dispatch KYC Rejection notification via Meta WhatsApp template "affiliate_kyc_rejected"
+   */
+  public async sendAffiliateKycRejectedWhatsApp(
+    phone: string,
+    affiliateName: string
+  ): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+    return this.sendAffiliateTemplateWhatsApp(
+      phone,
+      'affiliate_kyc_rejected',
+      affiliateName,
+      'KYC rejection'
+    );
+  }
+
+  /**
+   * Dispatch KYC Approval notification via Meta WhatsApp template "affiliate_kyc_approved"
+   */
+  public async sendAffiliateKycApprovedWhatsApp(
+    phone: string,
+    affiliateName: string
+  ): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+    return this.sendAffiliateTemplateWhatsApp(
+      phone,
+      'affiliate_kyc_approved',
+      affiliateName,
+      'KYC approval'
+    );
+  }
+
+  /**
+   * Dispatch Profile Approval (Proceed to KYC) notification via Meta WhatsApp template "affiliate_profile_approved"
+   */
+  public async sendAffiliateProfileApprovedWhatsApp(
+    phone: string,
+    affiliateName: string
+  ): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+    return this.sendAffiliateTemplateWhatsApp(
+      phone,
+      'affiliate_profile_approved',
+      affiliateName,
+      'Profile approval'
+    );
+  }
 }
 
 export const whatsappOtpService = new WhatsAppOtpService();

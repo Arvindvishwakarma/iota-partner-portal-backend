@@ -470,6 +470,54 @@ export class AdminService {
     return mapAffiliateRow(partner);
   }
 
+  private dispatchPartnerReviewNotification(
+    updated: {
+      emailAddress: string | null;
+      whatsappNumber: string | null;
+      mobileNumber: string;
+      firstName: string;
+    },
+    kind: 'ACTIVE' | 'KYC_PENDING' | 'KYC_REVISED' | 'KYC_REJECTED' | 'PROFILE_REJECTED'
+  ) {
+    const emailLower = (updated.emailAddress || '').trim().toLowerCase();
+    const isSyntheticTestEmail =
+      env.NODE_ENV !== 'production' &&
+      env.ALLOW_TEST_OTP_BYPASS &&
+      (emailLower.endsWith('@test.iotaacademy.in') || emailLower.endsWith('@example.com'));
+
+    if (isSyntheticTestEmail) {
+      logger.info(`[Test Mode] Skipped external WhatsApp/Email ${kind} dispatch for ${emailLower}`);
+      return;
+    }
+
+    const phone = updated.whatsappNumber || updated.mobileNumber;
+    const waDispatchers = {
+      ACTIVE: () => whatsappOtpService.sendAffiliateKycApprovedWhatsApp(phone, updated.firstName),
+      KYC_PENDING: () => whatsappOtpService.sendAffiliateProfileApprovedWhatsApp(phone, updated.firstName),
+      KYC_REVISED: () => whatsappOtpService.sendAffiliateKycRevisedWhatsApp(phone, updated.firstName),
+      KYC_REJECTED: () => whatsappOtpService.sendAffiliateKycRejectedWhatsApp(phone, updated.firstName),
+      PROFILE_REJECTED: () => whatsappOtpService.sendAffiliateRejectionWhatsApp(phone, updated.firstName)
+    };
+
+    waDispatchers[kind]().catch((waErr) => {
+      logger.warn(`[WhatsApp ${kind} Message] Dispatch warning:`, waErr);
+    });
+
+    if (emailLower) {
+      const emailDispatchers = {
+        ACTIVE: () => emailOtpService.sendAffiliateKycApprovedEmail(emailLower, updated.firstName),
+        KYC_PENDING: () => emailOtpService.sendAffiliateProfileApprovedEmail(emailLower, updated.firstName),
+        KYC_REVISED: () => emailOtpService.sendAffiliateKycRevisedEmail(emailLower, updated.firstName),
+        KYC_REJECTED: () => emailOtpService.sendAffiliateKycRejectedEmail(emailLower, updated.firstName),
+        PROFILE_REJECTED: () => emailOtpService.sendAffiliateRejectionEmail(emailLower, updated.firstName)
+      };
+
+      emailDispatchers[kind]().catch((mailErr) => {
+        logger.warn(`[Email ${kind} Message] Dispatch warning:`, mailErr);
+      });
+    }
+  }
+
   async reviewPartner(
     partnerId: string,
     status: AffiliateStatus,
@@ -512,8 +560,10 @@ export class AdminService {
         });
       });
 
+      this.dispatchPartnerReviewNotification(updated, 'ACTIVE');
+
       return mapAffiliateRow(updated);
-    } else if (status === AffiliateStatus.KYC_REJECTED) {
+    } else if (status === AffiliateStatus.KYC_REVISED) {
       const remark = (kycRevisionRemark || rejectionReason || '').trim();
       if (!remark) {
         throw new AppError('KYC revision remark is required', 400, 'MISSING_REJECTION_REASON');
@@ -522,13 +572,15 @@ export class AdminService {
       const updated = await prisma.affiliate.update({
         where: { id: partnerId },
         data: {
-          status: AffiliateStatus.KYC_REJECTED,
+          status: AffiliateStatus.KYC_REVISED,
           kycRevisionRemark: remark
         }
       });
 
+      this.dispatchPartnerReviewNotification(updated, 'KYC_REVISED');
+
       return mapAffiliateRow(updated);
-    } else if (status === AffiliateStatus.PROFILE_REJECTED) {
+    } else if (status === AffiliateStatus.PROFILE_REJECTED || status === AffiliateStatus.KYC_REJECTED) {
       if (!rejectionReason?.trim()) {
         throw new AppError('Rejection reason is required', 400, 'MISSING_REJECTION_REASON');
       }
@@ -541,29 +593,10 @@ export class AdminService {
         }
       });
 
-      const emailLower = (updated.emailAddress || '').trim().toLowerCase();
-      const isSyntheticTestEmail =
-        env.NODE_ENV !== 'production' &&
-        env.ALLOW_TEST_OTP_BYPASS &&
-        (emailLower.endsWith('@test.iotaacademy.in') || emailLower.endsWith('@example.com'));
-
-      if (!isSyntheticTestEmail) {
-        whatsappOtpService
-          .sendAffiliateRejectionWhatsApp(updated.whatsappNumber || updated.mobileNumber, updated.firstName)
-          .catch((waErr) => {
-            logger.warn('[WhatsApp Rejection Message] Dispatch warning:', waErr);
-          });
-
-        if (emailLower) {
-          emailOtpService
-            .sendAffiliateRejectionEmail(emailLower, updated.firstName)
-            .catch((mailErr) => {
-              logger.warn('[Email Rejection Message] Dispatch warning:', mailErr);
-            });
-        }
-      } else {
-        logger.info(`[Test Mode] Skipped external WhatsApp/Email rejection dispatch for ${emailLower}`);
-      }
+      this.dispatchPartnerReviewNotification(
+        updated,
+        status === AffiliateStatus.KYC_REJECTED ? 'KYC_REJECTED' : 'PROFILE_REJECTED'
+      );
 
       return mapAffiliateRow(updated);
     }
@@ -575,6 +608,11 @@ export class AdminService {
         ...(status === AffiliateStatus.KYC_PENDING ? { rejectionReason: null } : {})
       }
     });
+
+    if (status === AffiliateStatus.KYC_PENDING) {
+      this.dispatchPartnerReviewNotification(updated, 'KYC_PENDING');
+    }
+
     return mapAffiliateRow(updated);
   }
 
