@@ -152,61 +152,28 @@ export class EmailOtpService {
       'Thank you for applying to the IOTA Academy Affiliate Program. Please use the verification code below to verify your email address:';
     const emailSubject = context?.subject || `${otp} is your IOTA Academy Partner verification code`;
 
-    const htmlBody = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>${emailTitle}</title>
-</head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="100%" max-width="540" style="max-width: 540px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
-          <!-- Header -->
-          <tr>
-            <td style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); padding: 32px 30px; text-align: center;">
-              <h1 style="color: #ffffff; font-size: 22px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">IOTA ACADEMY</h1>
-              <p style="color: #bfdbfe; font-size: 13px; margin: 6px 0 0; font-weight: 500;">Affiliate Program</p>
-            </td>
-          </tr>
-          <!-- Body -->
-          <tr>
-            <td style="padding: 36px 32px;">
-              <h2 style="color: #0f172a; font-size: 18px; margin: 0 0 12px; font-weight: 700;">${emailHeading}</h2>
-              <p style="color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 24px;">
+    const htmlBody = this.wrapEmailHtml({
+      title: emailTitle,
+      maxWidth: 540,
+      footerText: `© 2026 TECHIOTA LLP (IOTA Academy). All rights reserved. | Sent from <strong>${from}</strong>`,
+      bodyHtml: `
+              <h2 class="email-heading" style="color: #0f172a; font-size: 18px; margin: 0 0 12px; font-weight: 700;">${emailHeading}</h2>
+              <p class="email-muted" style="color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 24px;">
                 ${emailDesc}
               </p>
               
               <!-- OTP Box -->
-              <div style="background-color: #f0fdf4; border: 2px dashed #86efac; border-radius: 12px; padding: 20px; text-align: center; margin: 0 0 24px;">
+              <div class="callout-success" style="background-color: #f0fdf4; border: 2px dashed #86efac; border-radius: 12px; padding: 20px; text-align: center; margin: 0 0 24px;">
                 <span style="font-family: monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #15803d;">${otp}</span>
               </div>
 
-              <p style="color: #64748b; font-size: 13px; line-height: 1.5; margin: 0 0 8px;">
+              <p class="email-muted" style="color: #64748b; font-size: 13px; line-height: 1.5; margin: 0 0 8px;">
                 ⏳ This code is valid for <strong>10 minutes</strong>.
               </p>
-              <p style="color: #94a3b8; font-size: 12px; line-height: 1.5; margin: 0;">
+              <p class="email-muted" style="color: #94a3b8; font-size: 12px; line-height: 1.5; margin: 0;">
                 If you did not request this verification, please safely ignore this email.
-              </p>
-            </td>
-          </tr>
-          <!-- Footer -->
-          <tr>
-            <td style="background-color: #f1f5f9; padding: 20px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="color: #64748b; font-size: 11px; margin: 0;">
-                © 2026 TECHIOTA LLP (IOTA Academy). All rights reserved. | Sent from <strong>${from}</strong>
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-    `.trim();
+              </p>`
+    });
 
     // Strategy 1: Try nodemailer if installed
     try {
@@ -546,6 +513,99 @@ export class EmailOtpService {
   }
 
   /**
+   * Shared dark-mode-safe HTML wrapper for all IOTA Academy Affiliate Program emails
+   */
+  private wrapEmailHtml(opts: {
+    title: string;
+    bodyHtml: string;
+    maxWidth?: number;
+    footerText?: string;
+  }): string {
+    const maxWidth = opts.maxWidth ?? 580;
+    const footerText =
+      opts.footerText ?? '© 2026 TECHIOTA LLP (IOTA Academy). All rights reserved.';
+
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
+  <title>${opts.title}</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      supported-color-schemes: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      .email-bg { background-color: #0f172a !important; }
+      .email-card { background-color: #1e293b !important; border-color: #334155 !important; }
+      .email-body { color: #e2e8f0 !important; }
+      .email-heading { color: #f8fafc !important; }
+      .email-muted { color: #cbd5e1 !important; }
+      .email-brand { color: #93c5fd !important; }
+      .email-link { color: #60a5fa !important; }
+      .email-divider { border-top-color: #334155 !important; }
+      .email-footer { background-color: #0f172a !important; border-top-color: #334155 !important; }
+      .callout-danger { background-color: #2b1619 !important; }
+      .callout-warning { background-color: #292011 !important; }
+      .callout-success { background-color: #0f2922 !important; }
+      .callout-info { background-color: #172554 !important; }
+      .callout-neutral { background-color: #0f172a !important; }
+    }
+    [data-ogsc] .email-bg { background-color: #0f172a !important; }
+    [data-ogsc] .email-card { background-color: #1e293b !important; border-color: #334155 !important; }
+    [data-ogsc] .email-body { color: #e2e8f0 !important; }
+    [data-ogsc] .email-heading { color: #f8fafc !important; }
+    [data-ogsc] .email-muted { color: #cbd5e1 !important; }
+    [data-ogsc] .email-brand { color: #93c5fd !important; }
+    [data-ogsc] .email-link { color: #60a5fa !important; }
+    [data-ogsc] .email-divider { border-top-color: #334155 !important; }
+    [data-ogsc] .email-footer { background-color: #0f172a !important; border-top-color: #334155 !important; }
+    [data-ogsc] .callout-danger { background-color: #2b1619 !important; }
+    [data-ogsc] .callout-warning { background-color: #292011 !important; }
+    [data-ogsc] .callout-success { background-color: #0f2922 !important; }
+    [data-ogsc] .callout-info { background-color: #172554 !important; }
+    [data-ogsc] .callout-neutral { background-color: #0f172a !important; }
+  </style>
+</head>
+<body class="email-bg" style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <table class="email-bg" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table class="email-card" width="100%" style="max-width: ${maxWidth}px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
+          <tr>
+            <td bgcolor="#1e3a8a" style="background-color: #1e3a8a; background-image: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); padding: 32px 30px; text-align: center;">
+              <div style="background: #000000; mix-blend-mode: screen;">
+                <div style="background: #000000; mix-blend-mode: difference;">
+                  <h1 style="color: #ffffff; font-size: 22px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">IOTA ACADEMY</h1>
+                  <p style="color: #e2e8f0; font-size: 13px; margin: 6px 0 0; font-weight: 500;">Affiliate Program</p>
+                </div>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td class="email-body" style="padding: 36px 32px; color: #1e293b; font-size: 14px; line-height: 1.65;">
+              ${opts.bodyHtml}
+            </td>
+          </tr>
+          <tr>
+            <td class="email-footer" style="background-color: #f8fafc; padding: 20px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p class="email-muted" style="color: #94a3b8; font-size: 11px; margin: 0;">${footerText}</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `.trim();
+  }
+
+  /**
    * Send Welcome / Registration confirmation email to newly registered affiliate
    */
   public async sendAffiliateRegistrationEmail(toEmail: string, affiliateName: string): Promise<boolean> {
@@ -574,74 +634,39 @@ Website: https://affiliate.iotaacademy.in
 Email: affiliate@iotaacademy.in
 WhatsApp: +91 89625 45150`;
 
-    const htmlBody = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>IOTA Academy Affiliate Program</title>
-</head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="100%" style="max-width: 580px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
-          <!-- Header -->
-          <tr>
-            <td style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); padding: 32px 30px; text-align: center;">
-              <h1 style="color: #ffffff; font-size: 22px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">IOTA ACADEMY</h1>
-              <p style="color: #bfdbfe; font-size: 13px; margin: 6px 0 0; font-weight: 500;">Affiliate Program</p>
-            </td>
-          </tr>
-          <!-- Body -->
-          <tr>
-            <td style="padding: 36px 32px; color: #1e293b; font-size: 14px; line-height: 1.6;">
-              <p style="margin: 0 0 16px; font-size: 16px; font-weight: 700; color: #0f172a;">Hi ${firstName},</p>
+    const htmlBody = this.wrapEmailHtml({
+      title: 'IOTA Academy Affiliate Program',
+      bodyHtml: `
+              <p class="email-heading" style="margin: 0 0 16px; font-size: 16px; font-weight: 700; color: #0f172a;">Hi ${firstName},</p>
               <p style="margin: 0 0 16px;">Thank you for registering with the <strong>IOTA Academy Affiliate Program</strong>!</p>
               <p style="margin: 0 0 20px;">Your profile has been successfully created and is currently <strong>Pending Approval</strong>.</p>
               
-              <div style="background-color: #f1f5f9; border-left: 4px solid #2563eb; border-radius: 8px; padding: 16px 20px; margin: 0 0 24px;">
-                <h3 style="margin: 0 0 10px; font-size: 14px; font-weight: 700; color: #0f172a;">What happens next?</h3>
-                <p style="margin: 0 0 8px; color: #334155; font-size: 13px;">• Our team is reviewing your registration details. Please wait while this process is completed.</p>
-                <p style="margin: 0 0 8px; color: #334155; font-size: 13px;">• We will notify you within <strong>7 business days</strong> with an update and the next steps to complete your KYC verification.</p>
-                <p style="margin: 0; color: #334155; font-size: 13px;">• Once your profile is approved, you will receive further instructions to proceed with KYC document submission.</p>
+              <div class="callout-neutral" style="background-color: #f1f5f9; border-left: 4px solid #2563eb; border-radius: 8px; padding: 16px 20px; margin: 0 0 24px;">
+                <h3 class="email-heading" style="margin: 0 0 10px; font-size: 14px; font-weight: 700; color: #0f172a;">What happens next?</h3>
+                <p class="email-muted" style="margin: 0 0 8px; color: #334155; font-size: 13px;">• Our team is reviewing your registration details. Please wait while this process is completed.</p>
+                <p class="email-muted" style="margin: 0 0 8px; color: #334155; font-size: 13px;">• We will notify you within <strong>7 business days</strong> with an update and the next steps to complete your KYC verification.</p>
+                <p class="email-muted" style="margin: 0; color: #334155; font-size: 13px;">• Once your profile is approved, you will receive further instructions to proceed with KYC document submission.</p>
               </div>
 
               <p style="margin: 0 0 24px;">Thank you for your patience and interest in partnering with IOTA Academy.</p>
 
               <p style="margin: 0 0 4px; font-weight: 600;">Regards,</p>
-              <p style="margin: 0 0 16px; font-weight: 700; color: #1e3a8a;">Team IOTA Academy</p>
+              <p class="email-brand" style="margin: 0 0 16px; font-weight: 700; color: #1e3a8a;">Team IOTA Academy</p>
 
-              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+              <hr class="email-divider" style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
 
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
+              <table class="email-muted" width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
                 <tr>
-                  <td style="padding: 3px 0;"><strong>Website:</strong> <a href="https://affiliate.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://affiliate.iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><strong>Website:</strong> <a class="email-link" href="https://affiliate.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://affiliate.iotaacademy.in</a></td>
                 </tr>
                 <tr>
-                  <td style="padding: 3px 0;"><strong>Email:</strong> <a href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><strong>Email:</strong> <a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
                 </tr>
                 <tr>
-                  <td style="padding: 3px 0;"><strong>WhatsApp:</strong> <a href="https://wa.me/918962545150" style="color: #2563eb; text-decoration: none;" target="_blank">+91 89625 45150</a></td>
+                  <td style="padding: 3px 0;"><strong>WhatsApp:</strong> <a class="email-link" href="https://wa.me/918962545150" style="color: #2563eb; text-decoration: none;" target="_blank">+91 89625 45150</a></td>
                 </tr>
-              </table>
-            </td>
-          </tr>
-          <!-- Footer -->
-          <tr>
-            <td style="background-color: #f8fafc; padding: 20px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="color: #94a3b8; font-size: 11px; margin: 0;">
-                © 2026 TECHIOTA LLP (IOTA Academy). All rights reserved.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-    `.trim();
+              </table>`
+    });
 
     return this.sendCustomEmail(cleanEmail, subject, textBody, htmlBody);
   }
@@ -670,62 +695,32 @@ IOTA Academy
 affiliate@iotaacademy.in
 https://www.iotaacademy.in`;
 
-    const htmlBody = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>IOTA Academy Affiliate Program</title>
-</head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="100%" style="max-width: 580px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
-          <tr>
-            <td style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); padding: 32px 30px; text-align: center;">
-              <h1 style="color: #ffffff; font-size: 22px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">IOTA ACADEMY</h1>
-              <p style="color: #bfdbfe; font-size: 13px; margin: 6px 0 0; font-weight: 500;">Affiliate Program</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 36px 32px; color: #1e293b; font-size: 14px; line-height: 1.65;">
-              <p style="margin: 0 0 16px; font-size: 16px; font-weight: 700; color: #0f172a;">Hi ${firstName},</p>
+    const htmlBody = this.wrapEmailHtml({
+      title: 'IOTA Academy Affiliate Program',
+      bodyHtml: `
+              <p class="email-heading" style="margin: 0 0 16px; font-size: 16px; font-weight: 700; color: #0f172a;">Hi ${firstName},</p>
               <p style="margin: 0 0 16px;">After reviewing your registration details, we regret to inform you that your affiliate profile has been rejected.</p>
               <p style="margin: 0 0 12px;">To understand the reason for rejection, please log in to your affiliate profile using the link below:</p>
-              <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; border-radius: 8px; padding: 16px 20px; margin: 0 0 20px;">
-                <p style="margin: 0 0 8px; font-weight: 700; color: #7f1d1d;">Login to Your Affiliate Profile:</p>
-                <p style="margin: 0;"><a href="https://affiliate.iotaacademy.in/login" style="color: #2563eb; font-weight: 600; text-decoration: none;" target="_blank">https://affiliate.iotaacademy.in/login</a></p>
+              <div class="callout-danger" style="background-color: #fef2f2; border-left: 4px solid #dc2626; border-radius: 8px; padding: 16px 20px; margin: 0 0 20px;">
+                <p style="margin: 0 0 8px; font-weight: 700; color: #ef4444;">Login to Your Affiliate Profile:</p>
+                <p style="margin: 0;"><a class="email-link" href="https://affiliate.iotaacademy.in/login" style="color: #2563eb; font-weight: 600; text-decoration: none;" target="_blank">https://affiliate.iotaacademy.in/login</a></p>
               </div>
               <p style="margin: 0 0 16px;">You can view the rejection reason and related details directly in your profile.</p>
-              <p style="margin: 0 0 16px;">For any clarification or assistance, please contact us at <a href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></p>
+              <p style="margin: 0 0 16px;">For any clarification or assistance, please contact us at <a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></p>
               <p style="margin: 0 0 24px;">Thank you for your interest in joining the IOTA Academy Affiliate Program.</p>
               <p style="margin: 0 0 4px; font-weight: 600;">Regards,</p>
-              <p style="margin: 0 0 2px; font-weight: 700; color: #1e3a8a;">Affiliate Program Team</p>
-              <p style="margin: 0 0 16px; font-weight: 600; color: #334155;">IOTA Academy</p>
-              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
+              <p class="email-brand" style="margin: 0 0 2px; font-weight: 700; color: #1e3a8a;">Affiliate Program Team</p>
+              <p class="email-muted" style="margin: 0 0 16px; font-weight: 600; color: #334155;">IOTA Academy</p>
+              <hr class="email-divider" style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+              <table class="email-muted" width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
                 <tr>
-                  <td style="padding: 3px 0;"><a href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
                 </tr>
                 <tr>
-                  <td style="padding: 3px 0;"><a href="https://www.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://www.iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><a class="email-link" href="https://www.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://www.iotaacademy.in</a></td>
                 </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color: #f8fafc; padding: 20px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="color: #94a3b8; font-size: 11px; margin: 0;">© 2026 TECHIOTA LLP (IOTA Academy). All rights reserved.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-    `.trim();
+              </table>`
+    });
 
     return this.sendCustomEmail(cleanEmail, subject, textBody, htmlBody);
   }
@@ -757,65 +752,35 @@ IOTA Academy
 affiliate@iotaacademy.in
 https://www.iotaacademy.in`;
 
-    const htmlBody = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>IOTA Academy Affiliate Program</title>
-</head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="100%" style="max-width: 580px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
-          <tr>
-            <td style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); padding: 32px 30px; text-align: center;">
-              <h1 style="color: #ffffff; font-size: 22px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">IOTA ACADEMY</h1>
-              <p style="color: #bfdbfe; font-size: 13px; margin: 6px 0 0; font-weight: 500;">Affiliate Program</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 36px 32px; color: #1e293b; font-size: 14px; line-height: 1.65;">
-              <p style="margin: 0 0 16px; font-size: 16px; font-weight: 700; color: #0f172a;">Hi ${firstName},</p>
+    const htmlBody = this.wrapEmailHtml({
+      title: 'IOTA Academy Affiliate Program',
+      bodyHtml: `
+              <p class="email-heading" style="margin: 0 0 16px; font-size: 16px; font-weight: 700; color: #0f172a;">Hi ${firstName},</p>
               <p style="margin: 0 0 12px;">Your KYC submission for the IOTA Academy Affiliate Program has been reviewed by our team.</p>
               <p style="margin: 0 0 16px;">Some updates are required before your KYC can be approved.</p>
-              <p style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">What should you do next?</p>
+              <p class="email-heading" style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">What should you do next?</p>
               <p style="margin: 0 0 16px;">Please log in to your affiliate profile to view the requested corrections and the details provided by our team.</p>
-              <div style="background-color: #fffbeb; border-left: 4px solid #d97706; border-radius: 8px; padding: 16px 20px; margin: 0 0 20px;">
-                <p style="margin: 0 0 8px; font-weight: 700; color: #92400e;">Login to Your Affiliate Profile:</p>
-                <p style="margin: 0;"><a href="https://affiliate.iotaacademy.in/login" style="color: #2563eb; font-weight: 600; text-decoration: none;" target="_blank">https://affiliate.iotaacademy.in/login</a></p>
+              <div class="callout-warning" style="background-color: #fffbeb; border-left: 4px solid #d97706; border-radius: 8px; padding: 16px 20px; margin: 0 0 20px;">
+                <p style="margin: 0 0 8px; font-weight: 700; color: #d97706;">Login to Your Affiliate Profile:</p>
+                <p style="margin: 0;"><a class="email-link" href="https://affiliate.iotaacademy.in/login" style="color: #2563eb; font-weight: 600; text-decoration: none;" target="_blank">https://affiliate.iotaacademy.in/login</a></p>
               </div>
               <p style="margin: 0 0 20px;">After completing the required updates, please resubmit your KYC for verification.</p>
-              <p style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">Need Assistance?</p>
-              <p style="margin: 0 0 4px;">Email: <a href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></p>
+              <p class="email-heading" style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">Need Assistance?</p>
+              <p style="margin: 0 0 4px;">Email: <a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></p>
               <p style="margin: 0 0 24px;">WhatsApp / Call: +91 89625 45150</p>
               <p style="margin: 0 0 4px; font-weight: 600;">Regards,</p>
-              <p style="margin: 0 0 2px; font-weight: 700; color: #1e3a8a;">Affiliate Program Team</p>
-              <p style="margin: 0 0 16px; font-weight: 600; color: #334155;">IOTA Academy</p>
-              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
+              <p class="email-brand" style="margin: 0 0 2px; font-weight: 700; color: #1e3a8a;">Affiliate Program Team</p>
+              <p class="email-muted" style="margin: 0 0 16px; font-weight: 600; color: #334155;">IOTA Academy</p>
+              <hr class="email-divider" style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+              <table class="email-muted" width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
                 <tr>
-                  <td style="padding: 3px 0;"><a href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
                 </tr>
                 <tr>
-                  <td style="padding: 3px 0;"><a href="https://www.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://www.iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><a class="email-link" href="https://www.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://www.iotaacademy.in</a></td>
                 </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color: #f8fafc; padding: 20px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="color: #94a3b8; font-size: 11px; margin: 0;">© 2026 TECHIOTA LLP (IOTA Academy). All rights reserved.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-    `.trim();
+              </table>`
+    });
 
     return this.sendCustomEmail(cleanEmail, subject, textBody, htmlBody);
   }
@@ -847,65 +812,35 @@ IOTA Academy
 affiliate@iotaacademy.in
 https://www.iotaacademy.in`;
 
-    const htmlBody = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>IOTA Academy Affiliate Program</title>
-</head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="100%" style="max-width: 580px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
-          <tr>
-            <td style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); padding: 32px 30px; text-align: center;">
-              <h1 style="color: #ffffff; font-size: 22px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">IOTA ACADEMY</h1>
-              <p style="color: #bfdbfe; font-size: 13px; margin: 6px 0 0; font-weight: 500;">Affiliate Program</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 36px 32px; color: #1e293b; font-size: 14px; line-height: 1.65;">
-              <p style="margin: 0 0 16px; font-size: 16px; font-weight: 700; color: #0f172a;">Hi ${firstName},</p>
+    const htmlBody = this.wrapEmailHtml({
+      title: 'IOTA Academy Affiliate Program',
+      bodyHtml: `
+              <p class="email-heading" style="margin: 0 0 16px; font-size: 16px; font-weight: 700; color: #0f172a;">Hi ${firstName},</p>
               <p style="margin: 0 0 16px;">We regret to inform you that your KYC verification for the IOTA Academy Affiliate Program has been rejected by our team.</p>
-              <p style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">View Your KYC Rejection Reason</p>
+              <p class="email-heading" style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">View Your KYC Rejection Reason</p>
               <p style="margin: 0 0 12px;">To understand the reason for rejection, please log in to your affiliate profile using the link below:</p>
-              <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; border-radius: 8px; padding: 16px 20px; margin: 0 0 20px;">
-                <p style="margin: 0 0 8px; font-weight: 700; color: #7f1d1d;">Login to Your Affiliate Profile:</p>
-                <p style="margin: 0;"><a href="https://affiliate.iotaacademy.in/login" style="color: #2563eb; font-weight: 600; text-decoration: none;" target="_blank">https://affiliate.iotaacademy.in/login</a></p>
+              <div class="callout-danger" style="background-color: #fef2f2; border-left: 4px solid #dc2626; border-radius: 8px; padding: 16px 20px; margin: 0 0 20px;">
+                <p style="margin: 0 0 8px; font-weight: 700; color: #ef4444;">Login to Your Affiliate Profile:</p>
+                <p style="margin: 0;"><a class="email-link" href="https://affiliate.iotaacademy.in/login" style="color: #2563eb; font-weight: 600; text-decoration: none;" target="_blank">https://affiliate.iotaacademy.in/login</a></p>
               </div>
               <p style="margin: 0 0 20px;">You can view the rejection reason and related details directly in your profile.</p>
-              <p style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">Need Assistance?</p>
+              <p class="email-heading" style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">Need Assistance?</p>
               <p style="margin: 0 0 8px;">For any clarification or assistance, please contact us:</p>
-              <p style="margin: 0 0 4px;">Email: <a href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></p>
+              <p style="margin: 0 0 4px;">Email: <a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></p>
               <p style="margin: 0 0 24px;">WhatsApp / Call: +91 89625 45150</p>
               <p style="margin: 0 0 4px; font-weight: 600;">Regards,</p>
-              <p style="margin: 0 0 2px; font-weight: 700; color: #1e3a8a;">Affiliate Program Team</p>
-              <p style="margin: 0 0 16px; font-weight: 600; color: #334155;">IOTA Academy</p>
-              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
+              <p class="email-brand" style="margin: 0 0 2px; font-weight: 700; color: #1e3a8a;">Affiliate Program Team</p>
+              <p class="email-muted" style="margin: 0 0 16px; font-weight: 600; color: #334155;">IOTA Academy</p>
+              <hr class="email-divider" style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+              <table class="email-muted" width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
                 <tr>
-                  <td style="padding: 3px 0;"><a href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
                 </tr>
                 <tr>
-                  <td style="padding: 3px 0;"><a href="https://www.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://www.iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><a class="email-link" href="https://www.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://www.iotaacademy.in</a></td>
                 </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color: #f8fafc; padding: 20px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="color: #94a3b8; font-size: 11px; margin: 0;">© 2026 TECHIOTA LLP (IOTA Academy). All rights reserved.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-    `.trim();
+              </table>`
+    });
 
     return this.sendCustomEmail(cleanEmail, subject, textBody, htmlBody);
   }
@@ -941,68 +876,38 @@ IOTA Academy
 affiliate@iotaacademy.in
 https://www.iotaacademy.in`;
 
-    const htmlBody = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>IOTA Academy Affiliate Program</title>
-</head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="100%" style="max-width: 580px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
-          <tr>
-            <td style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); padding: 32px 30px; text-align: center;">
-              <h1 style="color: #ffffff; font-size: 22px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">IOTA ACADEMY</h1>
-              <p style="color: #bfdbfe; font-size: 13px; margin: 6px 0 0; font-weight: 500;">Affiliate Program</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 36px 32px; color: #1e293b; font-size: 14px; line-height: 1.65;">
-              <p style="margin: 0 0 16px; font-size: 16px; font-weight: 700; color: #0f172a;">Hi ${firstName},</p>
-              <p style="margin: 0 0 12px; font-weight: 700; color: #059669;">Congratulations!</p>
+    const htmlBody = this.wrapEmailHtml({
+      title: 'IOTA Academy Affiliate Program',
+      bodyHtml: `
+              <p class="email-heading" style="margin: 0 0 16px; font-size: 16px; font-weight: 700; color: #0f172a;">Hi ${firstName},</p>
+              <p style="margin: 0 0 12px; font-weight: 700; color: #10b981;">Congratulations!</p>
               <p style="margin: 0 0 12px;">Your KYC verification for the IOTA Academy Affiliate Program has been successfully approved by our team.</p>
               <p style="margin: 0 0 16px;">Your affiliate account is now <strong>Active</strong>, and you can start referring students to IOTA Academy.</p>
-              <p style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">Start Referring Students</p>
+              <p class="email-heading" style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">Start Referring Students</p>
               <p style="margin: 0 0 12px;">Log in to your affiliate dashboard to access your unique referral link and QR code.</p>
-              <div style="background-color: #ecfdf5; border-left: 4px solid #059669; border-radius: 8px; padding: 16px 20px; margin: 0 0 20px;">
-                <p style="margin: 0;"><a href="https://affiliate.iotaacademy.in/login" style="color: #059669; font-weight: 700; text-decoration: none;" target="_blank">Access Your Affiliate Dashboard</a></p>
+              <div class="callout-success" style="background-color: #ecfdf5; border-left: 4px solid #059669; border-radius: 8px; padding: 16px 20px; margin: 0 0 20px;">
+                <p style="margin: 0;"><a href="https://affiliate.iotaacademy.in/login" style="color: #10b981; font-weight: 700; text-decoration: none;" target="_blank">Access Your Affiliate Dashboard</a></p>
               </div>
-              <p style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">Your Next Step</p>
+              <p class="email-heading" style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">Your Next Step</p>
               <p style="margin: 0 0 12px;">Start sharing your referral link with students who are interested in learning Data, AI and Technology. Let them submit their enquiries through your referral link so our counselling team can guide them through the admission process.</p>
               <p style="margin: 0 0 20px;">Please follow the IOTA Academy Affiliate Program Terms and Conditions while referring students.</p>
-              <p style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">For assistance:</p>
-              <p style="margin: 0 0 4px;">Email: <a href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></p>
+              <p class="email-heading" style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">For assistance:</p>
+              <p style="margin: 0 0 4px;">Email: <a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></p>
               <p style="margin: 0 0 16px;">WhatsApp / Call: +91 89625 45150</p>
-              <p style="margin: 0 0 20px; font-weight: 700; color: #0f172a;">Welcome aboard!</p>
+              <p class="email-heading" style="margin: 0 0 20px; font-weight: 700; color: #0f172a;">Welcome aboard!</p>
               <p style="margin: 0 0 4px; font-weight: 600;">Regards,</p>
-              <p style="margin: 0 0 2px; font-weight: 700; color: #1e3a8a;">Affiliate Program Team</p>
-              <p style="margin: 0 0 16px; font-weight: 600; color: #334155;">IOTA Academy</p>
-              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
+              <p class="email-brand" style="margin: 0 0 2px; font-weight: 700; color: #1e3a8a;">Affiliate Program Team</p>
+              <p class="email-muted" style="margin: 0 0 16px; font-weight: 600; color: #334155;">IOTA Academy</p>
+              <hr class="email-divider" style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+              <table class="email-muted" width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
                 <tr>
-                  <td style="padding: 3px 0;"><a href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
                 </tr>
                 <tr>
-                  <td style="padding: 3px 0;"><a href="https://www.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://www.iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><a class="email-link" href="https://www.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://www.iotaacademy.in</a></td>
                 </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color: #f8fafc; padding: 20px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="color: #94a3b8; font-size: 11px; margin: 0;">© 2026 TECHIOTA LLP (IOTA Academy). All rights reserved.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-    `.trim();
+              </table>`
+    });
 
     return this.sendCustomEmail(cleanEmail, subject, textBody, htmlBody);
   }
@@ -1034,64 +939,34 @@ IOTA Academy
 affiliate@iotaacademy.in
 https://www.iotaacademy.in`;
 
-    const htmlBody = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>IOTA Academy Affiliate Program</title>
-</head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="100%" style="max-width: 580px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
-          <tr>
-            <td style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); padding: 32px 30px; text-align: center;">
-              <h1 style="color: #ffffff; font-size: 22px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">IOTA ACADEMY</h1>
-              <p style="color: #bfdbfe; font-size: 13px; margin: 6px 0 0; font-weight: 500;">Affiliate Program</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 36px 32px; color: #1e293b; font-size: 14px; line-height: 1.65;">
-              <p style="margin: 0 0 16px; font-size: 16px; font-weight: 700; color: #0f172a;">Hi ${firstName},</p>
+    const htmlBody = this.wrapEmailHtml({
+      title: 'IOTA Academy Affiliate Program',
+      bodyHtml: `
+              <p class="email-heading" style="margin: 0 0 16px; font-size: 16px; font-weight: 700; color: #0f172a;">Hi ${firstName},</p>
               <p style="margin: 0 0 12px;">Your profile for the IOTA Academy Affiliate Program has been successfully reviewed and approved by our team.</p>
               <p style="margin: 0 0 16px;">You can now proceed to the next step: <strong>KYC Verification</strong>.</p>
-              <p style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">Complete Your KYC Verification</p>
+              <p class="email-heading" style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">Complete Your KYC Verification</p>
               <p style="margin: 0 0 12px;">Please log in to your affiliate profile and upload the required KYC documents to complete the verification process.</p>
-              <div style="background-color: #eff6ff; border-left: 4px solid #2563eb; border-radius: 8px; padding: 16px 20px; margin: 0 0 20px;">
-                <p style="margin: 0;"><a href="https://affiliate.iotaacademy.in/login" style="color: #2563eb; font-weight: 700; text-decoration: none;" target="_blank">Login &amp; Upload KYC Documents</a></p>
+              <div class="callout-info" style="background-color: #eff6ff; border-left: 4px solid #2563eb; border-radius: 8px; padding: 16px 20px; margin: 0 0 20px;">
+                <p style="margin: 0;"><a class="email-link" href="https://affiliate.iotaacademy.in/login" style="color: #2563eb; font-weight: 700; text-decoration: none;" target="_blank">Login &amp; Upload KYC Documents</a></p>
               </div>
-              <p style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">For any assistance, please contact us:</p>
-              <p style="margin: 0 0 4px;">Email: <a href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></p>
+              <p class="email-heading" style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">For any assistance, please contact us:</p>
+              <p style="margin: 0 0 4px;">Email: <a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></p>
               <p style="margin: 0 0 16px;">WhatsApp / Call: +91 89625 45150</p>
               <p style="margin: 0 0 20px;">Thank you for your interest in the IOTA Academy Affiliate Program. We look forward to completing your onboarding.</p>
               <p style="margin: 0 0 4px; font-weight: 600;">Regards,</p>
-              <p style="margin: 0 0 2px; font-weight: 700; color: #1e3a8a;">Affiliate Program Team</p>
-              <p style="margin: 0 0 16px; font-weight: 600; color: #334155;">IOTA Academy</p>
-              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
+              <p class="email-brand" style="margin: 0 0 2px; font-weight: 700; color: #1e3a8a;">Affiliate Program Team</p>
+              <p class="email-muted" style="margin: 0 0 16px; font-weight: 600; color: #334155;">IOTA Academy</p>
+              <hr class="email-divider" style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+              <table class="email-muted" width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
                 <tr>
-                  <td style="padding: 3px 0;"><a href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
                 </tr>
                 <tr>
-                  <td style="padding: 3px 0;"><a href="https://www.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://www.iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><a class="email-link" href="https://www.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://www.iotaacademy.in</a></td>
                 </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color: #f8fafc; padding: 20px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="color: #94a3b8; font-size: 11px; margin: 0;">© 2026 TECHIOTA LLP (IOTA Academy). All rights reserved.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-    `.trim();
+              </table>`
+    });
 
     return this.sendCustomEmail(cleanEmail, subject, textBody, htmlBody);
   }

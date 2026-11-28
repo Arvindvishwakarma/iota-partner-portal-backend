@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-11-28T06:43:42.600Z",
+  "timestamp": "2026-11-28T06:54:00.125Z",
   "success": true,
   "transport": "nodemailer",
   "toEmail": "arvindvish2588@gmail.com",
   "subject": "Your IOTA Academy Affiliate Profile is Approved — Complete KYC",
-  "messageId": "<457ff680-4a0f-3cd2-7f70-5d2aa15d7c96@iotaacademy.in>"
+  "messageId": "<c40533a7-cb0e-058c-8a7a-de46a7c52aae@iotaacademy.in>"
 }
