@@ -1,10 +1,10 @@
 /**
- * IOTA Academy Authorized Partner Portal - Shared Constants (Backend)
+ * IOTA Academy Affiliate Program - Shared Constants (Backend)
  */
 
 import { LeadStatus } from './types';
 
-export const APP_NAME = 'IOTA Authorized Partner Portal';
+export const APP_NAME = 'IOTA Academy Affiliate Program';
 export const APP_ORGANIZATION = 'IOTA Academy';
 
 export const INDIAN_PHONE_REGEX = /^\+91[6-9]\d{9}$/;

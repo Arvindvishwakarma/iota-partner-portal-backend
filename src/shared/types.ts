@@ -1,5 +1,5 @@
 /**
- * IOTA Academy Authorized Partner Portal - Shared Types (Backend)
+ * IOTA Academy Affiliate Program - Shared Types (Backend)
  */
 
 export enum Role {

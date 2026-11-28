@@ -250,7 +250,7 @@ export class AdminController {
     }
   }
 
-  // Contact Inquiries Handlers
+  // Contact Enquiries Handlers
   async listContactMessages(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const result = await adminService.listContactMessages(req.query);

@@ -36,6 +36,7 @@ export const updateLeadStatusSchema = z
     demoMode: z.enum(['Online', 'Offline']).optional().nullable(),
     demoDate: z.string().trim().max(30).optional().nullable(),
     demoTime: z.string().trim().max(30).optional().nullable(),
+    demoFaculty: z.enum(['Abhishek Sir', 'Hemant Sir', 'Shivam Sir']).optional().nullable(),
     rescheduleReason: z.string().trim().max(500).optional().nullable(),
     callbackDate: z.string().trim().max(30).optional().nullable(),
     callbackTime: z.string().trim().max(30).optional().nullable(),
@@ -104,7 +105,7 @@ export const updateLeadStatusSchema = z
     }
 
     if (stage.mainStatus === 'Demo In Progress') {
-      if (cleanSub === 'Online Demo Booked' || cleanSub === 'Offline Demo Booked') {
+      if (cleanSub === 'Demo Booked' || cleanSub === 'Online Demo Booked' || cleanSub === 'Offline Demo Booked') {
         if (!data.demoMode) {
           ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['demoMode'], message: 'Demo mode is required' });
         }
@@ -114,6 +115,9 @@ export const updateLeadStatusSchema = z
         if (!data.demoTime?.trim()) {
           ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['demoTime'], message: 'Demo time is required' });
         }
+        if (!data.demoFaculty) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['demoFaculty'], message: 'Demo faculty is required' });
+        }
       } else if (cleanSub === 'Demo Rescheduled') {
         if (!data.demoDate?.trim()) {
           ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['demoDate'], message: 'New demo date is required' });
@@ -121,22 +125,6 @@ export const updateLeadStatusSchema = z
         if (!data.demoTime?.trim()) {
           ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['demoTime'], message: 'New demo time is required' });
         }
-        if (!data.rescheduleReason?.trim()) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ['rescheduleReason'],
-            message: 'Reason for rescheduling is required'
-          });
-        }
-      }
-    }
-
-    if (cleanSub === 'Callback Requested' || cleanSub === 'Callback Scheduled') {
-      if (!data.callbackDate?.trim()) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['callbackDate'], message: 'Callback date is required' });
-      }
-      if (!data.callbackTime?.trim()) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['callbackTime'], message: 'Callback time is required' });
       }
     }
 

@@ -57,7 +57,7 @@ export const createApp = (): Express => {
   app.get('/', (req, res) => {
     res.json({
       status: 'UP',
-      message: 'IOTA Partner Portal Backend API is active',
+      message: 'IOTA Academy Affiliate Program Backend API is active',
       version: '1.0.0',
       timestamp: new Date().toISOString()
     });

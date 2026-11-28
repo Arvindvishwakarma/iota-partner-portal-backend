@@ -24,7 +24,7 @@ apiRouter.use('/auth', authRoutes);
 // Mount Admin endpoints under /api/v1/admin
 apiRouter.use('/admin', adminRoutes);
 
-// Mount Partner Portal endpoints under /api/v1/partner
+// Mount IOTA Academy Affiliate Program endpoints under /api/v1/partner
 apiRouter.use('/partner', partnerRoutes);
 
 // Mount Counselor CRM endpoints under /api/v1/counsellor

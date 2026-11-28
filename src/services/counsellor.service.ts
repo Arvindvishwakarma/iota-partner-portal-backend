@@ -501,6 +501,7 @@ export class CounsellorService {
     if (data.demoMode) metadata.demoMode = data.demoMode;
     if (data.demoDate) metadata.demoDate = data.demoDate;
     if (data.demoTime) metadata.demoTime = data.demoTime;
+    if (data.demoFaculty) metadata.demoFaculty = data.demoFaculty;
     if (data.rescheduleReason) metadata.rescheduleReason = data.rescheduleReason;
     if (data.callbackDate) metadata.callbackDate = data.callbackDate;
     if (data.callbackTime) metadata.callbackTime = data.callbackTime;

@@ -631,7 +631,7 @@ Thank you for your patience and interest in partnering with IOTA Academy.
 Regards,
 Team IOTA Academy
 Website: https://affiliate.iotaacademy.in
-Email: affiliate@iotaacademy.in
+Email: wecare@iotaacademy.in
 WhatsApp: +91 89625 45150`;
 
     const htmlBody = this.wrapEmailHtml({
@@ -660,7 +660,7 @@ WhatsApp: +91 89625 45150`;
                   <td style="padding: 3px 0;"><strong>Website:</strong> <a class="email-link" href="https://affiliate.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://affiliate.iotaacademy.in</a></td>
                 </tr>
                 <tr>
-                  <td style="padding: 3px 0;"><strong>Email:</strong> <a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><strong>Email:</strong> <a class="email-link" href="mailto:wecare@iotaacademy.in" style="color: #2563eb; text-decoration: none;">wecare@iotaacademy.in</a></td>
                 </tr>
                 <tr>
                   <td style="padding: 3px 0;"><strong>WhatsApp:</strong> <a class="email-link" href="https://wa.me/918962545150" style="color: #2563eb; text-decoration: none;" target="_blank">+91 89625 45150</a></td>
@@ -687,12 +687,12 @@ To understand the reason for rejection, please log in to your affiliate profile 
 Login to Your Affiliate Profile:
 https://affiliate.iotaacademy.in/login
 You can view the rejection reason and related details directly in your profile.
-For any clarification or assistance, please contact us at affiliate@iotaacademy.in
+For any clarification or assistance, please contact us at wecare@iotaacademy.in
 Thank you for your interest in joining the IOTA Academy Affiliate Program.
 Regards,
 Affiliate Program Team
 IOTA Academy
-affiliate@iotaacademy.in
+wecare@iotaacademy.in
 https://www.iotaacademy.in`;
 
     const htmlBody = this.wrapEmailHtml({
@@ -706,7 +706,7 @@ https://www.iotaacademy.in`;
                 <p style="margin: 0;"><a class="email-link" href="https://affiliate.iotaacademy.in/login" style="color: #2563eb; font-weight: 600; text-decoration: none;" target="_blank">https://affiliate.iotaacademy.in/login</a></p>
               </div>
               <p style="margin: 0 0 16px;">You can view the rejection reason and related details directly in your profile.</p>
-              <p style="margin: 0 0 16px;">For any clarification or assistance, please contact us at <a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></p>
+              <p style="margin: 0 0 16px;">For any clarification or assistance, please contact us at <a class="email-link" href="mailto:wecare@iotaacademy.in" style="color: #2563eb; text-decoration: none;">wecare@iotaacademy.in</a></p>
               <p style="margin: 0 0 24px;">Thank you for your interest in joining the IOTA Academy Affiliate Program.</p>
               <p style="margin: 0 0 4px; font-weight: 600;">Regards,</p>
               <p class="email-brand" style="margin: 0 0 2px; font-weight: 700; color: #1e3a8a;">Affiliate Program Team</p>
@@ -714,7 +714,7 @@ https://www.iotaacademy.in`;
               <hr class="email-divider" style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
               <table class="email-muted" width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
                 <tr>
-                  <td style="padding: 3px 0;"><a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><a class="email-link" href="mailto:wecare@iotaacademy.in" style="color: #2563eb; text-decoration: none;">wecare@iotaacademy.in</a></td>
                 </tr>
                 <tr>
                   <td style="padding: 3px 0;"><a class="email-link" href="https://www.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://www.iotaacademy.in</a></td>
@@ -744,12 +744,12 @@ Login to Your Affiliate Profile:
 https://affiliate.iotaacademy.in/login
 After completing the required updates, please resubmit your KYC for verification.
 Need Assistance?
-Email: affiliate@iotaacademy.in
+Email: wecare@iotaacademy.in
 WhatsApp / Call: +91 89625 45150
 Regards,
 Affiliate Program Team
 IOTA Academy
-affiliate@iotaacademy.in
+wecare@iotaacademy.in
 https://www.iotaacademy.in`;
 
     const htmlBody = this.wrapEmailHtml({
@@ -766,7 +766,7 @@ https://www.iotaacademy.in`;
               </div>
               <p style="margin: 0 0 20px;">After completing the required updates, please resubmit your KYC for verification.</p>
               <p class="email-heading" style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">Need Assistance?</p>
-              <p style="margin: 0 0 4px;">Email: <a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></p>
+              <p style="margin: 0 0 4px;">Email: <a class="email-link" href="mailto:wecare@iotaacademy.in" style="color: #2563eb; text-decoration: none;">wecare@iotaacademy.in</a></p>
               <p style="margin: 0 0 24px;">WhatsApp / Call: +91 89625 45150</p>
               <p style="margin: 0 0 4px; font-weight: 600;">Regards,</p>
               <p class="email-brand" style="margin: 0 0 2px; font-weight: 700; color: #1e3a8a;">Affiliate Program Team</p>
@@ -774,7 +774,7 @@ https://www.iotaacademy.in`;
               <hr class="email-divider" style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
               <table class="email-muted" width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
                 <tr>
-                  <td style="padding: 3px 0;"><a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><a class="email-link" href="mailto:wecare@iotaacademy.in" style="color: #2563eb; text-decoration: none;">wecare@iotaacademy.in</a></td>
                 </tr>
                 <tr>
                   <td style="padding: 3px 0;"><a class="email-link" href="https://www.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://www.iotaacademy.in</a></td>
@@ -804,12 +804,12 @@ https://affiliate.iotaacademy.in/login
 You can view the rejection reason and related details directly in your profile.
 Need Assistance?
 For any clarification or assistance, please contact us:
-Email: affiliate@iotaacademy.in
+Email: wecare@iotaacademy.in
 WhatsApp / Call: +91 89625 45150
 Regards,
 Affiliate Program Team
 IOTA Academy
-affiliate@iotaacademy.in
+wecare@iotaacademy.in
 https://www.iotaacademy.in`;
 
     const htmlBody = this.wrapEmailHtml({
@@ -826,7 +826,7 @@ https://www.iotaacademy.in`;
               <p style="margin: 0 0 20px;">You can view the rejection reason and related details directly in your profile.</p>
               <p class="email-heading" style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">Need Assistance?</p>
               <p style="margin: 0 0 8px;">For any clarification or assistance, please contact us:</p>
-              <p style="margin: 0 0 4px;">Email: <a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></p>
+              <p style="margin: 0 0 4px;">Email: <a class="email-link" href="mailto:wecare@iotaacademy.in" style="color: #2563eb; text-decoration: none;">wecare@iotaacademy.in</a></p>
               <p style="margin: 0 0 24px;">WhatsApp / Call: +91 89625 45150</p>
               <p style="margin: 0 0 4px; font-weight: 600;">Regards,</p>
               <p class="email-brand" style="margin: 0 0 2px; font-weight: 700; color: #1e3a8a;">Affiliate Program Team</p>
@@ -834,7 +834,7 @@ https://www.iotaacademy.in`;
               <hr class="email-divider" style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
               <table class="email-muted" width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
                 <tr>
-                  <td style="padding: 3px 0;"><a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><a class="email-link" href="mailto:wecare@iotaacademy.in" style="color: #2563eb; text-decoration: none;">wecare@iotaacademy.in</a></td>
                 </tr>
                 <tr>
                   <td style="padding: 3px 0;"><a class="email-link" href="https://www.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://www.iotaacademy.in</a></td>
@@ -867,13 +867,13 @@ Your Next Step
 Start sharing your referral link with students who are interested in learning Data, AI and Technology. Let them submit their enquiries through your referral link so our counselling team can guide them through the admission process.
 Please follow the IOTA Academy Affiliate Program Terms and Conditions while referring students.
 For assistance:
-Email: affiliate@iotaacademy.in
+Email: wecare@iotaacademy.in
 WhatsApp / Call: +91 89625 45150
 Welcome aboard!
 Regards,
 Affiliate Program Team
 IOTA Academy
-affiliate@iotaacademy.in
+wecare@iotaacademy.in
 https://www.iotaacademy.in`;
 
     const htmlBody = this.wrapEmailHtml({
@@ -892,7 +892,7 @@ https://www.iotaacademy.in`;
               <p style="margin: 0 0 12px;">Start sharing your referral link with students who are interested in learning Data, AI and Technology. Let them submit their enquiries through your referral link so our counselling team can guide them through the admission process.</p>
               <p style="margin: 0 0 20px;">Please follow the IOTA Academy Affiliate Program Terms and Conditions while referring students.</p>
               <p class="email-heading" style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">For assistance:</p>
-              <p style="margin: 0 0 4px;">Email: <a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></p>
+              <p style="margin: 0 0 4px;">Email: <a class="email-link" href="mailto:wecare@iotaacademy.in" style="color: #2563eb; text-decoration: none;">wecare@iotaacademy.in</a></p>
               <p style="margin: 0 0 16px;">WhatsApp / Call: +91 89625 45150</p>
               <p class="email-heading" style="margin: 0 0 20px; font-weight: 700; color: #0f172a;">Welcome aboard!</p>
               <p style="margin: 0 0 4px; font-weight: 600;">Regards,</p>
@@ -901,7 +901,7 @@ https://www.iotaacademy.in`;
               <hr class="email-divider" style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
               <table class="email-muted" width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
                 <tr>
-                  <td style="padding: 3px 0;"><a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><a class="email-link" href="mailto:wecare@iotaacademy.in" style="color: #2563eb; text-decoration: none;">wecare@iotaacademy.in</a></td>
                 </tr>
                 <tr>
                   <td style="padding: 3px 0;"><a class="email-link" href="https://www.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://www.iotaacademy.in</a></td>
@@ -930,13 +930,13 @@ Please log in to your affiliate profile and upload the required KYC documents to
 Login & Upload KYC Documents:
 https://affiliate.iotaacademy.in/login
 For any assistance, please contact us:
-Email: affiliate@iotaacademy.in
+Email: wecare@iotaacademy.in
 WhatsApp / Call: +91 89625 45150
 Thank you for your interest in the IOTA Academy Affiliate Program. We look forward to completing your onboarding.
 Regards,
 Affiliate Program Team
 IOTA Academy
-affiliate@iotaacademy.in
+wecare@iotaacademy.in
 https://www.iotaacademy.in`;
 
     const htmlBody = this.wrapEmailHtml({
@@ -951,7 +951,7 @@ https://www.iotaacademy.in`;
                 <p style="margin: 0;"><a class="email-link" href="https://affiliate.iotaacademy.in/login" style="color: #2563eb; font-weight: 700; text-decoration: none;" target="_blank">Login &amp; Upload KYC Documents</a></p>
               </div>
               <p class="email-heading" style="margin: 0 0 6px; font-weight: 700; color: #0f172a;">For any assistance, please contact us:</p>
-              <p style="margin: 0 0 4px;">Email: <a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></p>
+              <p style="margin: 0 0 4px;">Email: <a class="email-link" href="mailto:wecare@iotaacademy.in" style="color: #2563eb; text-decoration: none;">wecare@iotaacademy.in</a></p>
               <p style="margin: 0 0 16px;">WhatsApp / Call: +91 89625 45150</p>
               <p style="margin: 0 0 20px;">Thank you for your interest in the IOTA Academy Affiliate Program. We look forward to completing your onboarding.</p>
               <p style="margin: 0 0 4px; font-weight: 600;">Regards,</p>
@@ -960,7 +960,7 @@ https://www.iotaacademy.in`;
               <hr class="email-divider" style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
               <table class="email-muted" width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 12px; color: #475569;">
                 <tr>
-                  <td style="padding: 3px 0;"><a class="email-link" href="mailto:affiliate@iotaacademy.in" style="color: #2563eb; text-decoration: none;">affiliate@iotaacademy.in</a></td>
+                  <td style="padding: 3px 0;"><a class="email-link" href="mailto:wecare@iotaacademy.in" style="color: #2563eb; text-decoration: none;">wecare@iotaacademy.in</a></td>
                 </tr>
                 <tr>
                   <td style="padding: 3px 0;"><a class="email-link" href="https://www.iotaacademy.in" style="color: #2563eb; text-decoration: none;" target="_blank">https://www.iotaacademy.in</a></td>

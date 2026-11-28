@@ -61,7 +61,7 @@ router.post('/visits/bulk-assign', validateBody(bulkAssignVisitsSchema), adminCo
 router.get('/leads', adminController.listLeads);
 router.patch('/leads/:id/reassign', validateBody(reassignLeadSchema), adminController.reassignLead);
 
-// Contact Messages / Inquiries Management
+// Contact Messages / Enquiries Management
 router.get('/contacts', adminController.listContactMessages);
 router.get('/contacts/:id', adminController.getContactMessage);
 router.patch('/contacts/:id', validateBody(updateContactStatusSchema), adminController.updateContactMessageStatus);

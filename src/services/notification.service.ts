@@ -118,12 +118,12 @@ export class NotificationService {
       <h2 class="title">${title}</h2>
       <div class="message">${message}</div>
       ${actionUrl
-        ? `<a href="${actionUrl}" class="button" target="_blank">View Details in Portal</a>`
+        ? `<a href="${actionUrl}" class="button" target="_blank">View Details in Dashbord</a>`
         : ''
       }
     </div>
     <div class="footer">
-      This is an automated operational notification from IOTA Academy, Indore, Karnataka.<br>
+      This is an automated operational notification from IOTA Academy, Indore<br>
       © 2026 IOTA Academy. All rights reserved.
     </div>
   </div>
@@ -369,12 +369,12 @@ export class NotificationService {
         ...l,
         user: l.user
           ? {
-              id: l.user.id,
-              fullName: formatFullName(l.user.firstName, l.user.lastName),
-              email: l.user.emailAddress,
-              phone: l.user.mobileNumber,
-              role: l.user.role
-            }
+            id: l.user.id,
+            fullName: formatFullName(l.user.firstName, l.user.lastName),
+            email: l.user.emailAddress,
+            phone: l.user.mobileNumber,
+            role: l.user.role
+          }
           : undefined
       })),
       meta: {

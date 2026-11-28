@@ -536,7 +536,13 @@ export class AdminService {
         affiliateCode = await generateUniqueAffiliateCode();
       }
 
-      const frontendBase = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
+      const rawFrontendBase = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
+      const frontendBase =
+        rawFrontendBase.includes('localhost') ||
+          rawFrontendBase.includes('127.0.0.1') ||
+          rawFrontendBase.includes('vercel.app')
+          ? 'https://affiliate.iotaacademy.in'
+          : rawFrontendBase;
       const registrationUrl = `${frontendBase}/register/${affiliateCode}`;
 
       const updated = await prisma.$transaction(async (tx) => {
@@ -1010,7 +1016,7 @@ export class AdminService {
   }
 
   // ============================================================================
-  // CONTACT INQUIRIES MANAGEMENT
+  // CONTACT ENQUIRIES MANAGEMENT
   // ============================================================================
 
   async listContactMessages(query: {

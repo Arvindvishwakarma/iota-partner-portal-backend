@@ -193,7 +193,11 @@ export class PartnerService {
       }
     });
 
-    const baseUrl = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
+    const rawBaseUrl = (env.FRONTEND_URL || 'https://affiliate.iotaacademy.in').replace(/\/+$/, '');
+    const baseUrl =
+      rawBaseUrl.includes('localhost') || rawBaseUrl.includes('127.0.0.1') || rawBaseUrl.includes('vercel.app')
+        ? 'https://affiliate.iotaacademy.in'
+        : rawBaseUrl;
     const liveRegistrationUrl = `${baseUrl}/register/${affiliate.affiliateCode}`;
 
     const [

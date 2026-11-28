@@ -54,8 +54,7 @@ export const PIPELINE_STAGES: readonly PipelineStageDefinition[] = [
   {
     mainStatus: 'Demo In Progress',
     subStatuses: [
-      'Online Demo Booked',
-      'Offline Demo Booked',
+      'Demo Booked',
       'Demo Rescheduled',
       'Demo Cancelled',
       'Demo Not Attended'

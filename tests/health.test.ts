@@ -10,7 +10,7 @@ describe('Health Check Endpoints', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data.status).toBe('UP');
-    expect(res.body.data.application).toBe('IOTA Authorized Partner Portal');
+    expect(res.body.data.application).toBe('IOTA Academy Affiliate Program');
   });
 
   it('GET /api/v1/health returns 200 and operational status', async () => {

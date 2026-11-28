@@ -14,7 +14,7 @@ router.get('/', (req: Request, res: Response) => {
       uptimeSeconds: Math.floor(process.uptime()),
       environment: process.env.NODE_ENV || 'development'
     },
-    message: 'IOTA Partner Portal Backend Service Operational'
+    message: 'IOTA Academy Affiliate Program Backend Service Operational'
   });
 });
 

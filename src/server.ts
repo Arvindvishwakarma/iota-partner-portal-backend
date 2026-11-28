@@ -8,7 +8,7 @@ if (!process.env.VERCEL) {
   const PORT = env.PORT || 5000;
 
   const server = app.listen(PORT, () => {
-    logger.info(`🚀 IOTA Partner Portal Backend running on http://localhost:${PORT}`);
+    logger.info(`🚀 IOTA Academy Affiliate Program Backend running on http://localhost:${PORT}`);
     logger.info(`Environment: ${env.NODE_ENV} | Frontend: ${env.FRONTEND_URL}`);
   });
 
